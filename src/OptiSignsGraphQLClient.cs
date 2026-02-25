@@ -216,6 +216,79 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         }
 
         /// <summary>
+        /// Collapses a multi-line GraphQL query into a compact single-line form
+        /// so the serialized JSON body is readable without embedded \r\n noise.
+        /// </summary>
+        private static string CollapseQuery(string query)
+        {
+            if (string.IsNullOrEmpty(query)) return query;
+            // Replace all runs of whitespace (including \r\n from verbatim strings) with a single space.
+            return System.Text.RegularExpressions.Regex.Replace(query.Trim(), @"\s+", " ");
+        }
+
+        /// <summary>
+        /// Builds a complete log block as a single string, avoiding Serilog's
+        /// continuation-line padding that misaligns multi-line JSON.
+        /// </summary>
+        private string BuildRequestLog(string json)
+        {
+            var maskedKey = _apiKey != null && _apiKey.Length > 8
+                ? _apiKey.Substring(0, 8) + "..."
+                : "(empty)";
+
+            var sb = new StringBuilder();
+            sb.AppendLine();
+            sb.AppendLine(_separator);
+            sb.AppendLine("[OptiSigns] Request:");
+            sb.AppendLine(_separator);
+            sb.AppendFormat("Method: POST\n");
+            sb.AppendFormat("GraphQL Endpoint: {0}\n", GraphQlEndpoint);
+            sb.AppendLine("Content-Type: application/json");
+            sb.AppendFormat("Authorization: Bearer {0}\n", maskedKey);
+            sb.AppendLine("Body:");
+            sb.AppendLine(FormatJson(json));
+            sb.AppendLine(_separator);
+            return sb.ToString();
+        }
+
+        private string BuildResponseLog(HttpResponseMessage httpResponse, string responseBody)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine();
+            sb.AppendLine(_separator);
+            sb.AppendLine("[OptiSigns] Response:");
+            sb.AppendLine(_separator);
+            sb.AppendFormat("Method: POST\n");
+            sb.AppendFormat("GraphQL Endpoint: {0}\n", GraphQlEndpoint);
+            sb.AppendFormat("Status: {0} ({1})\n", (int)httpResponse.StatusCode, httpResponse.ReasonPhrase);
+            sb.AppendLine("Body:");
+            sb.AppendLine(FormatJson(responseBody));
+            sb.AppendLine(_separator);
+            return sb.ToString();
+        }
+
+        private string BuildGraphQlErrorLog(string errorMessage, string requestJson, string responseBody)
+        {
+            var maskedKey = _apiKey != null && _apiKey.Length > 8
+                ? _apiKey.Substring(0, 8) + "..."
+                : "(empty)";
+
+            var sb = new StringBuilder();
+            sb.AppendLine();
+            sb.AppendLine(_separator);
+            sb.AppendFormat("[OptiSigns] GraphQL error: {0}\n", errorMessage);
+            sb.AppendLine(_separator);
+            sb.AppendFormat("Endpoint: {0}\n", GraphQlEndpoint);
+            sb.AppendFormat("ApiKey: {0}\n", maskedKey);
+            sb.AppendLine("Request Body:");
+            sb.AppendLine(FormatJson(requestJson));
+            sb.AppendLine("Response Body:");
+            sb.AppendLine(FormatJson(responseBody));
+            sb.AppendLine(_separator);
+            return sb.ToString();
+        }
+
+        /// <summary>
         /// Serializes a GraphQL request, sends it as HTTP POST with Bearer auth,
         /// deserializes the response envelope, and returns the typed data object.
         /// Returns null on any error; all failures are logged but never rethrown.
@@ -229,29 +302,13 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             {
                 var requestBody = new GraphQlRequest
                 {
-                    Query = query,
+                    Query = CollapseQuery(query),
                     Variables = variables
                 };
 
                 var json = JsonConvert.SerializeObject(requestBody);
 
-                this.LogVerbose(
-                    @"
-{4}
-[OptiSigns] Request: 
-{4}
-Method: {0} 
-GraphQL Endpoint: {1}
-Content-Type: application/json
-Authorization: Bearer {2}
-Body:
-{3}
-{4}",
-                    HttpMethod.Post,
-                    GraphQlEndpoint,
-                    _apiKey != null && _apiKey.Length > 8 ? _apiKey.Substring(0, 8) : "(empty)",
-                    FormatJson(json),
-                    _separator);
+                this.LogVerbose("{0}", BuildRequestLog(json));
 
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
@@ -265,23 +322,7 @@ Body:
                 var httpResponse = await HttpClient.SendAsync(request).ConfigureAwait(false);
                 var responseBody = await httpResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
 
-                this.LogVerbose(
-                    @"
-{5}
-[OptiSigns] Response: 
-{5}
-Method: {0} 
-GraphQL Endpoint: {1}
-Status: {2} ({3})
-Body:
-{4}
-{5}",
-                    HttpMethod.Post,
-                    GraphQlEndpoint,
-                    (int)httpResponse.StatusCode,
-                    httpResponse.ReasonPhrase,
-                    FormatJson(responseBody),
-                    _separator);
+                this.LogVerbose("{0}", BuildResponseLog(httpResponse, responseBody));
 
                 if (!httpResponse.IsSuccessStatusCode)
                 {
@@ -294,24 +335,7 @@ Body:
                 if (envelope?.Errors != null && envelope.Errors.Count > 0)
                 {
                     foreach (var error in envelope.Errors)
-                        this.LogWarning(
-                            @"
-{5}
-[OptiSigns] GraphQL error: {0}
-{5}
-Endpoint: {1}
-ApiKey: {2}
-Request Body:
-{3}
-Response Body:
-{4}
-{5}",
-                            error.Message,
-                            GraphQlEndpoint,
-                            _apiKey != null && _apiKey.Length > 8 ? _apiKey.Substring(0, 8) : "(empty)",
-                            FormatJson(json),
-                            FormatJson(responseBody),
-                            _separator);
+                        this.LogWarning("{0}", BuildGraphQlErrorLog(error.Message, json, responseBody));
                     // Return data anyway; partial results are valid in GraphQL
                 }
 
