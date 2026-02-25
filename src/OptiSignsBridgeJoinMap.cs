@@ -140,7 +140,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 JoinCapabilities = eJoinCapabilities.ToSIMPL,
                 JoinType = eJoinType.Analog
             });
-        
+
         [JoinName("SelectPlaylistByIndex")]
         public JoinDataComplete SelectPlaylistByIndex = new JoinDataComplete(
             new JoinData { JoinNumber = 6, JoinSpan = 1 },
@@ -154,7 +154,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 JoinCapabilities = eJoinCapabilities.ToFromSIMPL,
                 JoinType = eJoinType.Analog
             });
-        
+
         #endregion
 
         #region Serial
@@ -168,7 +168,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 JoinCapabilities = eJoinCapabilities.ToSIMPL,
                 JoinType = eJoinType.Serial
             });
-            
+
         [JoinName("LastHeartBeat")]
         public JoinDataComplete LastHeartBeat = new JoinDataComplete(
             new JoinData { JoinNumber = 2, JoinSpan = 1 },
@@ -190,7 +190,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 JoinCapabilities = eJoinCapabilities.FromSIMPL,
                 JoinType = eJoinType.Serial
             });
-    
+
         [JoinName("CurrentPlaylistName")]
         public JoinDataComplete CurrentPlaylistName = new JoinDataComplete(
             new JoinData { JoinNumber = 6, JoinSpan = 1 },
@@ -212,8 +212,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 JoinCapabilities = eJoinCapabilities.ToSIMPL,
                 JoinType = eJoinType.Serial
             });
-    
-        
+
+
         [JoinName("PlaylistNames")]
         public JoinDataComplete PlaylistNames = new JoinDataComplete(
             new JoinData { JoinNumber = 11, JoinSpan = 30 },
