@@ -11,12 +11,12 @@
 			"group": "signage",
 			"uid": 1,
 			"properties": {
-				"apiKey": "YOUR_OPTISIGNS_API_KEY_HERE",
-				"teamId": "YOUR_TEAM_ID_HERE",
-				"deviceId": "YOUR_OPTISIGNS_SCREEN_DEVICE_ID_HERE",
+				"apiKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZWFtSWQiOiI2NWEzYjJjMWQ0ZTVmNjAwMTIzNDU2NzgiLCJpYXQiOjE3MDUyMDAwMDB9.abcdefghijklmnopqrstuvwxyz1234567890ABCDEFG",
+				"teamId": "65a3b2c1d4e5f60012345678",
+				"deviceId": "64f1a9e8b3c2d70098765432",
 				"pollIntervalMs": 30000,
 				"playlistPollIntervalMs": 300000,
-				"defaultPlaylistId": "YOUR_DEFAULT_PLAYLIST_ID_HERE",
+				"defaultPlaylistId": "PLAYLIST_ID_1",
 				"playlists": [
 					{
 						"id": "PLAYLIST_ID_1",
