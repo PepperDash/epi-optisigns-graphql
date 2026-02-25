@@ -196,55 +196,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         // ──────────────────────────────────────────────
         // Private HTTP execution core
-        // ──────────────────────────────────────────────
-
-        /// <summary>
-        /// Attempts to pretty-print a JSON string for readable log output.
-        /// Returns the original string unchanged if parsing fails.
-        /// </summary>
-        private static string FormatJson(string raw)
-        {
-            try
-            {
-                var obj = JsonConvert.DeserializeObject(raw);
-                return JsonConvert.SerializeObject(obj, Formatting.Indented);
-            }
-            catch
-            {
-                return raw;
-            }
-        }
-
-        /// <summary>
-        /// Collapses a multi-line GraphQL query into a compact single-line form
-        /// so the serialized JSON body is readable without embedded \r\n noise.
-        /// </summary>
-        private static string CollapseQuery(string query)
-        {
-            if (string.IsNullOrEmpty(query)) return query;
-            return System.Text.RegularExpressions.Regex.Replace(query.Trim(), @"\s+", " ");
-        }
-
-        /// <summary>
-        /// Logs each line of a multi-line string as a separate LogVerbose call
-        /// to prevent Serilog's continuation-line padding from misaligning output.
-        /// </summary>
-        private void LogVerboseLines(string multiLineMessage)
-        {
-            var lines = multiLineMessage.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-            foreach (var line in lines)
-                this.LogVerbose("{0}", line);
-        }
-
-        /// <summary>
-        /// Logs each line of a multi-line string as a separate LogWarning call.
-        /// </summary>
-        private void LogWarningLines(string multiLineMessage)
-        {
-            var lines = multiLineMessage.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-            foreach (var line in lines)
-                this.LogWarning("{0}", line);
-        }
+        // ──────────────────────────────────────────────        
 
         private string MaskedApiKey
         {
@@ -256,51 +208,65 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             }
         }
 
-        private void LogRequest(string json)
+        private void LogRequest(HttpMethod method = null, string body = null)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine(_separator);
-            sb.AppendLine("[OptiSigns] Request:");
-            sb.AppendLine(_separator);
-            sb.AppendLine("Method: POST");
-            sb.AppendFormat("GraphQL Endpoint: {0}", GraphQlEndpoint).AppendLine();
-            sb.AppendLine("Content-Type: application/json");
-            sb.AppendFormat("Authorization: Bearer {0}", MaskedApiKey).AppendLine();
-            sb.AppendLine("Body:");
-            sb.Append(FormatJson(json)).AppendLine();
-            sb.Append(_separator);
-            LogVerboseLines(sb.ToString());
+            // this.LogVerbose(">>> Sending GraphQL Request\r\nmethod: {method}\r\nendpoint: {endpoint}\r\nheaders: Bearer {apiKey}\r\nrequestBody: {@requestBody}",
+            //     method, GraphQlEndpoint, MaskedApiKey, body);
+
+//             this.LogVerbose(@"\n
+// >>> Sending GraphQL Request\n
+// method: {method}\n
+// endpoint: {endpoint}\n
+// headers: Bearer {apiKey}\n
+// requestBody: {@requestBody}",
+//                 method, GraphQlEndpoint, MaskedApiKey, body);
+
+            this.LogVerbose(">>> Sending GraphQL Request");
+            this.LogVerbose("method: {method}", method);
+            this.LogVerbose("endpoint: {endpoint}", GraphQlEndpoint);
+            this.LogVerbose("headers: Bearer {apiKey}", MaskedApiKey);
+            this.LogVerbose("requestBody: {@requestBody}", body.Trim());
         }
 
-        private void LogResponse(HttpResponseMessage httpResponse, string responseBody)
+        private void LogResponse(HttpMethod method = null, HttpResponseMessage httpResponse = null, string body = null)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine(_separator);
-            sb.AppendLine("[OptiSigns] Response:");
-            sb.AppendLine(_separator);
-            sb.AppendLine("Method: POST");
-            sb.AppendFormat("GraphQL Endpoint: {0}", GraphQlEndpoint).AppendLine();
-            sb.AppendFormat("Status: {0} ({1})", (int)httpResponse.StatusCode, httpResponse.ReasonPhrase).AppendLine();
-            sb.AppendLine("Body:");
-            sb.Append(FormatJson(responseBody)).AppendLine();
-            sb.Append(_separator);
-            LogVerboseLines(sb.ToString());
+            // this.LogVerbose(">>> Received GraphQL Response\r\nmethod: {method}\r\nendpoint: {endpoint}\r\nstatus: {status} ({reasonPhrase})\r\nresponseBody: {@responseBody}",
+            //     method, GraphQlEndpoint, (int)httpResponse.StatusCode, httpResponse.ReasonPhrase, body);
+
+//             this.LogVerbose(@"\n
+// >>> Received GraphQL Response\n
+// method: {method}\n
+// endpoint: {endpoint}\n
+// status: {status} ({reasonPhrase})\n
+// responseBody: {@responseBody}",
+//                 method, GraphQlEndpoint, (int)httpResponse.StatusCode, httpResponse.ReasonPhrase, body);
+
+            this.LogVerbose(">>> Received GraphQL Response");
+            this.LogVerbose("method: {method}", method);
+            this.LogVerbose("endpoint: {endpoint}", GraphQlEndpoint);
+            this.LogVerbose("status: {status} ({reasonPhrase})", (int)httpResponse.StatusCode, httpResponse.ReasonPhrase);
+            this.LogVerbose("responseBody: {@responseBody}", body.Trim());
         }
 
-        private void LogGraphQlError(string errorMessage, string requestJson, string responseBody)
+        private void LogGraphQlError(string errorMessage, string requestBody, string responseBody)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine(_separator);
-            sb.AppendFormat("[OptiSigns] GraphQL error: {0}", errorMessage).AppendLine();
-            sb.AppendLine(_separator);
-            sb.AppendFormat("Endpoint: {0}", GraphQlEndpoint).AppendLine();
-            sb.AppendFormat("ApiKey: {0}", MaskedApiKey).AppendLine();
-            sb.AppendLine("Request Body:");
-            sb.Append(FormatJson(requestJson)).AppendLine();
-            sb.AppendLine("Response Body:");
-            sb.Append(FormatJson(responseBody)).AppendLine();
-            sb.Append(_separator);
-            LogWarningLines(sb.ToString());
+            // this.LogError(">>> GraphQL Error: {errorMessage}\r\nendpoint: {endpoint}\r\napiKey: {apiKey}\r\nrequestBody: {@requestBody}\r\nresponseBody: {@responseBody}",
+            //     errorMessage, GraphQlEndpoint, MaskedApiKey, requestBody, responseBody);
+
+//             this.LogError(@"\n
+// >>> GraphQL Error: {errorMessage}\n
+// endpoint: {endpoint}\n
+// apiKey: {apiKey}\n
+// requestBody: {@requestBody}\n
+// responseBody: {@responseBody}",
+//                 errorMessage, GraphQlEndpoint, MaskedApiKey, requestBody, responseBody);
+
+            this.LogError(">>> GraphQL Error");
+            this.LogError("errorMessage: {errorMessage}", errorMessage);
+            this.LogError("endpoint: {endpoint}", GraphQlEndpoint);
+            this.LogError("apiKey: {apiKey}", MaskedApiKey);
+            this.LogError("requestBody: {@requestBody}", requestBody.Trim());
+            this.LogError("responseBody: {@responseBody}", responseBody.Trim());
         }
 
         /// <summary>
@@ -317,15 +283,15 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             {
                 var requestBody = new GraphQlRequest
                 {
-                    Query = CollapseQuery(query),
+                    Query = query,
                     Variables = variables
                 };
 
-                var json = JsonConvert.SerializeObject(requestBody);
-
-                LogRequest(json);
-
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var requestBodyJson = JsonConvert.SerializeObject(requestBody);
+                
+                LogRequest(HttpMethod.Post, requestBodyJson);
+                
+                var content = new StringContent(requestBodyJson, Encoding.UTF8, "application/json");
 
                 var request = new HttpRequestMessage(HttpMethod.Post, GraphQlEndpoint)
                 {
@@ -337,11 +303,11 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 var httpResponse = await HttpClient.SendAsync(request).ConfigureAwait(false);
                 var responseBody = await httpResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
 
-                LogResponse(httpResponse, responseBody);
+                LogResponse(HttpMethod.Post, httpResponse, responseBody);
 
                 if (!httpResponse.IsSuccessStatusCode)
                 {
-                    this.LogError("[OptiSigns] HTTP {0}: {1}", (int)httpResponse.StatusCode, responseBody);
+                    this.LogError("HTTP {0}: {1}", (int)httpResponse.StatusCode, responseBody);
                     return null;
                 }
 
@@ -350,7 +316,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 if (envelope?.Errors != null && envelope.Errors.Count > 0)
                 {
                     foreach (var error in envelope.Errors)
-                        LogGraphQlError(error.Message, json, responseBody);
+                        LogGraphQlError(error.Message, requestBodyJson, responseBody);
                     // Return data anyway; partial results are valid in GraphQL
                 }
 
@@ -358,12 +324,13 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             }
             catch (TaskCanceledException)
             {
-                this.LogError("[OptiSigns] Request timed out");
+                this.LogError("Request timed out");
                 return null;
             }
             catch (Exception ex)
             {
-                this.LogError("[OptiSigns] HTTP exception: {0}", ex.Message);
+                this.LogError(ex, "Exception during GraphQL request");
+                this.LogError("HTTP exception: {0}", ex.Message);
                 return null;
             }
         }
