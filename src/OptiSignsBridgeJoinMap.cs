@@ -16,15 +16,15 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
     /// Digital 5   PollNow             FromSIMPL    Pulse to trigger an immediate status poll
     /// Digital 6   IsPolling           ToSIMPL      High while an async API call is in progress
     ///
-    /// Analog  1   InputSelect         ToFromSIMPL  1-based playlist index; 0 = unknown/off
-    /// Analog  2   PlaylistCount       ToSIMPL      Number of playlists available (capped at 30)
-    /// Analog  3   DeviceStatus        ToSIMPL      0=Unknown, 1=Ok, 2=Warning, 3=Error
+    /// Analog  1   DeviceStatus        ToSIMPL      0=Unknown, 1=Ok, 2=Warning, 3=Error
+    /// Analog  5   PlaylistCount       ToSIMPL      Number of playlists available (capped at 30)
+    /// Analog  6   SelectPlaylistByIndex ToFromSIMPL 1-based playlist index; 0 = unknown/off
     ///
     /// Serial  1   DeviceName          ToSIMPL      Plugin device name (from Essentials config)
-    /// Serial  3   CurrentPlaylistName ToSIMPL      Name of the currently active playlist
-    /// Serial  4   PlaylistList        ToSIMPL      Pipe-delimited list: "Name1|Name2|Name3"
-    /// Serial  5   SelectPlaylistById  FromSIMPL    Send a playlist _id string to select directly
-    /// Serial  6   LastHeartBeat       ToSIMPL      ISO 8601 timestamp of last device heartbeat
+    /// Serial  2   LastHeartBeat       ToSIMPL      ISO 8601 timestamp of last device heartbeat
+    /// Serial  6   SelectPlaylistById  FromSIMPL    Send a playlist _id string to select directly
+    /// Serial  6   CurrentPlaylistName ToSIMPL      Name of the currently active playlist
+    /// Serial  10  PlaylistList        ToSIMPL      Pipe-delimited list: "Name1|Name2|Name3"
     /// Serial  11  PlaylistName[1]     ToSIMPL      Name of playlist 1 (empty if slot unused)
     ///   ...
     /// Serial  40  PlaylistName[30]    ToSIMPL      Name of playlist 30 (empty if slot unused)
@@ -222,7 +222,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 Description = "Names of available playlists. " +
                               "S11 = playlist 1, S12 = playlist 2, ..., S40 = playlist 30. " +
                               "Slots beyond the current PlaylistCount are sent as empty strings. " +
-                              "Use PlaylistCount (A2) to know how many slots are populated.",
+                              "Use PlaylistCount (A5) to know how many slots are populated.",
                 JoinCapabilities = eJoinCapabilities.ToSIMPL,
                 JoinType = eJoinType.Serial
             });

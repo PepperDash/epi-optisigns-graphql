@@ -120,31 +120,35 @@ Join numbers below are **relative to `joinStart`**. With `joinStart: 1`, join nu
 
 ### Analogs
 
-| Input (From SIMPL)                    | Join | Output (To SIMPL)                        |
-| ------------------------------------- | ---- | ---------------------------------------- |
-| Input Select (1-based playlist index) | 1    | Input Select fb (current playlist index) |
-|                                       | 2    | Playlist Count fb (capped at 30)         |
+| Input (From SIMPL)                              | Join | Output (To SIMPL)                                                      |
+| ----------------------------------------------- | ---- | ---------------------------------------------------------------------- |
+|                                                 | 1    | Device Status fb (0=Unknown, 1=Ok/ONLINE, 2=Warning/SLEEP, 3=Error/OFFLINE) |
+|                                                 | 5    | Playlist Count fb (capped at 30)                                       |
+| Select Playlist by Index (1-based)              | 6    | Select Playlist by Index fb (current playlist index)                   |
 
 ### Serials
 
 | Input (From SIMPL)    | Join  | Output (To SIMPL)                                          |
 | --------------------- | ----- | ---------------------------------------------------------- |
 |                       | 1     | Device Name fb                                             |
-|                       | 2     | Device Status fb (`ONLINE` / `OFFLINE` / `SLEEP`)          |
-|                       | 3     | Current Playlist Name fb                                   |
-|                       | 4     | Playlist List fb (pipe-delimited: `"Name1\|Name2\|Name3"`) |
-| Select Playlist by ID | 5     |                                                            |
-|                       | 6     | Last HeartBeat fb (ISO 8601 timestamp)                     |
+|                       | 2     | Last HeartBeat fb (ISO 8601 timestamp)                     |
+| Select Playlist by ID | 6     | Current Playlist Name fb                                   |
+|                       | 10    | Playlist List fb (pipe-delimited: `"Name1\|Name2\|Name3"`) |
 |                       | 11    | Playlist Name[1] fb                                        |
 |                       | 12    | Playlist Name[2] fb                                        |
 |                       | …     | …                                                          |
 |                       | 40    | Playlist Name[30] fb                                       |
 
+#### Analog Join Notes
+
+- **A1 DeviceStatus** — maps the raw OptiSigns API status string to an analog value: `0` = StatusUnknown, `1` = IsOk (`ONLINE`), `2` = InWarning (`SLEEP`), `3` = InError (`OFFLINE`).
+- **A6 SelectPlaylistByIndex** — 1-based index into the available playlist list. Send from SIMPL to select; feedback reflects the current active playlist. `0` = no playlist active or unknown.
+
 #### Serial Join Notes
 
-- **S4 PlaylistList** — pipe-delimited names in index order. Index 1 corresponds to the first name. Suitable for populating a SIMPL+ string array or a button list.
-- **S5 SelectPlaylistById** — send a raw OptiSigns playlist `_id` string to select it immediately without needing to resolve its index. Useful for config-driven or event-triggered room logic.
-- **S11–S40 PlaylistName[N]** — individual playlist name strings (S11 = playlist 1, …, S40 = playlist 30). Slots beyond the current `PlaylistCount` (A2) are sent as empty strings. Use A2 to know how many slots are populated.
+- **S6 SelectPlaylistById / CurrentPlaylistName** — shared join: send a raw OptiSigns playlist `_id` string from SIMPL to select it immediately without needing to resolve its index. Feedback returns the name of the currently active playlist. Useful for config-driven or event-triggered room logic.
+- **S10 PlaylistList** — pipe-delimited names in index order. Index 1 corresponds to the first name. Suitable for populating a SIMPL+ string array or a button list.
+- **S11–S40 PlaylistName[N]** — individual playlist name strings (S11 = playlist 1, …, S40 = playlist 30). Slots beyond the current `PlaylistCount` (A5) are sent as empty strings. Use A5 to know how many slots are populated.
 
 ---
 
@@ -155,7 +159,7 @@ Two independent timers run after `Initialize()`:
 | Timer         | Default Interval                | What It Does                                                         |
 | ------------- | ------------------------------- | -------------------------------------------------------------------- |
 | Status poll   | 30s (`pollIntervalMs`)          | Queries device `currentType`, `status`, `lastHeartBeat`              |
-| Playlist poll | 5min (`playlistPollIntervalMs`) | Refreshes the available playlist list and updates S4, S11–S40, A1, and A2 feedback |
+| Playlist poll | 5min (`playlistPollIntervalMs`) | Refreshes the available playlist list and updates S10, S11–S40, A5, and A6 feedback |
 
 The status poll starts 2 seconds after initialization to let the playlist poll complete first. After a Power On, Power Off, or playlist select command, a one-shot confirmation poll fires 2 seconds later to reconcile optimistic UI state with the actual API response.
 
