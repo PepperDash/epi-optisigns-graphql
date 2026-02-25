@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using PepperDash.Core;
+using PepperDash.Core.Logging;
+using PepperDash.Essentials.Core;
 using Serilog.Events;
 
 namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
@@ -22,8 +24,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
     /// The static HttpClient is intentional: reusing a single instance avoids socket
     /// exhaustion from repeated connection teardown, which matters on embedded processors.
     /// </summary>
-    internal class OptiSignsGraphQLClient
+    internal class OptiSignsGraphQLClient : IKeyed
     {
+        public string Key { get; private set; }
         private const string GraphQlEndpoint =
             "https://graphql-gateway.optisigns.com/graphql";
 
@@ -96,8 +99,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         // ──────────────────────────────────────────────
 
-        public OptiSignsGraphQLClient(string apiKey)
+        public OptiSignsGraphQLClient(string key,string apiKey)
         {
+            Key = key + "-client";
             _apiKey = apiKey;
         }
 
@@ -226,8 +230,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
                 if (!httpResponse.IsSuccessStatusCode)
                 {
-                    Debug.LogMessage(LogEventLevel.Error,
-                        "[OptiSigns] HTTP {0}: {1}", (int)httpResponse.StatusCode, responseBody);
+                    this.LogError("[OptiSigns] HTTP {0}: {1}", (int)httpResponse.StatusCode, responseBody);
                     return null;
                 }
 
@@ -236,8 +239,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 if (envelope?.Errors != null && envelope.Errors.Count > 0)
                 {
                     foreach (var error in envelope.Errors)
-                        Debug.LogMessage(LogEventLevel.Warning,
-                            "[OptiSigns] GraphQL error: {0}", error.Message);
+                        this.LogWarning("[OptiSigns] GraphQL error: {0}", error.Message);
                     // Return data anyway; partial results are valid in GraphQL
                 }
 
@@ -245,13 +247,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             }
             catch (TaskCanceledException)
             {
-                Debug.LogMessage(LogEventLevel.Warning, "[OptiSigns] Request timed out");
+                this.LogWarning("[OptiSigns] Request timed out");
                 return null;
             }
             catch (Exception ex)
             {
-                Debug.LogMessage(LogEventLevel.Error,
-                    "[OptiSigns] HTTP exception: {0}", ex.Message);
+                this.LogError("[OptiSigns] HTTP exception: {0}", ex.Message);
                 return null;
             }
         }

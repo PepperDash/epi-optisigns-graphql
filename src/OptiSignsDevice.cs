@@ -87,7 +87,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             : base(key, name)
         {
             _props = props;
-            _client = new OptiSignsGraphQLClient(props.ApiKey);
+            _client = new OptiSignsGraphQLClient(Key, props.ApiKey);
 
             // Seed from static config so labels are available before the first API poll.
             if (_props.Playlists != null && _props.Playlists.Count > 0)

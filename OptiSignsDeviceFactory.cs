@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using PepperDash.Core;
-using PepperDash.Core.Logging;
 using PepperDash.Essentials.Core;
 using PepperDash.Essentials.Core.Config;
 using Serilog.Events;
@@ -22,31 +21,31 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         public override EssentialsDevice BuildDevice(DeviceConfig dc)
         {
-            Debug.LogMessage(LogEventLevel.Debug, "Building OptiSigns device: {0}", dc.Key);
+            this.LogDebug("Building OptiSigns device: {0}", dc.Key);
 
             var props = dc.Properties.ToObject<OptiSignsPropertiesConfig>();
 
             if (props == null)
             {
-                Debug.LogMessage(LogEventLevel.Error, "OptiSigns: failed to deserialize properties for device '{0}'. Check JSON schema.", dc.Key);
+                this.LogError("OptiSigns: failed to deserialize properties for device '{0}'. Check JSON schema.", dc.Key);
                 return null;
             }
 
             if (string.IsNullOrEmpty(props.ApiKey))
             {
-                Debug.LogMessage(LogEventLevel.Error, "OptiSigns: 'apiKey' is required in properties for device '{0}'", dc.Key);
+                this.LogError("OptiSigns: 'apiKey' is required in properties for device '{0}'", dc.Key);
                 return null;
             }
 
             if (string.IsNullOrEmpty(props.TeamId))
             {
-                Debug.LogMessage(LogEventLevel.Error, "OptiSigns: 'teamId' is required in properties for device '{0}'", dc.Key);
+                this.LogError("OptiSigns: 'teamId' is required in properties for device '{0}'", dc.Key);
                 return null;
             }
 
             if (string.IsNullOrEmpty(props.DeviceId))
             {
-                Debug.LogMessage(LogEventLevel.Error, "OptiSigns: 'deviceId' is required in properties for device '{0}'", dc.Key);
+                this.LogError("OptiSigns: 'deviceId' is required in properties for device '{0}'", dc.Key);
                 return null;
             }
 

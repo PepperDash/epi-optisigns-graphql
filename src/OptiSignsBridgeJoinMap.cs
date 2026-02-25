@@ -107,7 +107,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         [JoinName("IsPolling")]
         public JoinDataComplete IsPolling = new JoinDataComplete(
-            new JoinData { JoinNumber = 6, JoinSpan = 1 },
+            new JoinData { JoinNumber = 5, JoinSpan = 1 },
             new JoinMetadata
             {
                 Description = "High while an async API call is currently in progress.",
