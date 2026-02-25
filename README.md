@@ -115,8 +115,7 @@ Join numbers below are **relative to `joinStart`**. With `joinStart: 1`, join nu
 | Power On (pulse)     | 2    | Power Is On fb    |
 | Power Off (pulse)    | 3    | Power Is Off fb   |
 | Power Toggle (pulse) | 4    |                   |
-| Poll Now (pulse)     | 5    |                   |
-|                      | 6    | Is Polling fb     |
+| Poll Now (pulse)     | 5    | Is Polling fb     |
 
 ### Analogs
 
