@@ -1,4 +1,4 @@
-![PepperDash Logo](/images/logo_pdt_no_tagline_600.png)
+![PepperDash Logo](/images/essentials-plugin-blue.png)
 # OptiSigns GraphQL Plugin
 
 [OptiSigns API Reference](https://support.optisigns.com/hc/en-us/articles/4414558392339-API-Reference)
