@@ -1,0 +1,63 @@
+{
+  "system": {
+    "name": "OptiSigns Integration Demo",
+    "license": ""
+  },
+  "devices": [
+    {
+      "key": "optiSigns-lobby",
+      "name": "Lobby Digital Sign",
+      "type": "optiSigns",
+      "group": "signage",
+      "uid": 1,
+      "properties": {
+        "apiKey": "YOUR_OPTISIGNS_API_KEY_HERE",
+        "teamId": "YOUR_TEAM_ID_HERE",
+        "deviceId": "YOUR_OPTISIGNS_SCREEN_DEVICE_ID_HERE",
+        "pollIntervalMs": 30000,
+        "playlistPollIntervalMs": 300000,
+        "defaultPlaylistId": "YOUR_DEFAULT_PLAYLIST_ID_HERE",
+        "playlists": [
+          {
+            "id": "PLAYLIST_ID_1",
+            "name": "Welcome Loop"
+          },
+          {
+            "id": "PLAYLIST_ID_2",
+            "name": "Event Content"
+          },
+          {
+            "id": "PLAYLIST_ID_3",
+            "name": "Emergency Messaging"
+          }
+        ]
+      }
+    },
+    {
+      "key": "eiscBridge-signage",
+      "name": "Signage EISC Bridge",
+      "type": "eiscApiAdvanced",
+      "group": "api",
+      "uid": 2,
+      "properties": {
+        "control": {
+          "method": "ipidTcp",
+          "ipid": "A0",
+          "tcpSshProperties": {
+            "address": "127.0.0.2",
+            "port": 0
+          }
+        },
+        "devices": [
+          {
+            "deviceKey": "optiSigns-lobby",
+            "joinStart": 1
+          }
+        ]
+      }
+    }
+  ],
+  "rooms": [],
+  "sourceListKey": "",
+  "tieLines": []
+}

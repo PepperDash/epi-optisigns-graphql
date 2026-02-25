@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <ProjectType>ProgramLibrary</ProjectType>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <RootNamespace>PepperDash.Essentials.Plugins.Optisigns.GraphQL</RootNamespace>
+    <Deterministic>false</Deterministic>
+    <AssemblyTitle>epi-optisigns.4Series</AssemblyTitle>
+    <Company>PepperDash Technology</Company>
+    <Description>PepperDash Essentials Plugin for OptiSigns digital signage integration via GraphQL API.</Description>
+    <Copyright>Copyright © 2026 PepperDash Technology</Copyright>
+    <Version>1.0.0-local</Version>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <InformationalVersion>$(Version)</InformationalVersion>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <Authors>PepperDash Technology</Authors>
+    <PackageId>PepperDash.Essentials.Plugins.OptiSigns</PackageId>
+    <PackageProjectUrl>https://github.com/PepperDash/epi-optisigns-graphql</PackageProjectUrl>
+    <PackageTags>crestron 4series essentials pepperdash optisigns digital signage graphql</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DefineConstants>$(DefineConstants);SERIES4</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Properties\**" />
+    <EmbeddedResource Remove="Properties\**" />
+    <None Remove="Properties\**" />
+  </ItemGroup>
+
+  <!-- Required for HttpClient on net472 -->
+  <ItemGroup>
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="PepperDashEssentials" Version="2.24.4">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>
