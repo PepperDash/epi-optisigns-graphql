@@ -216,6 +216,14 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 };
 
                 var json = JsonConvert.SerializeObject(requestBody);
+
+                this.LogVerbose(
+                    "[OptiSigns] Request: {0} {1}\nContent-Type: application/json\nAuthorization: Bearer {2}...\nBody:\n{3}",
+                    HttpMethod.Post,
+                    GraphQlEndpoint,
+                    _apiKey != null && _apiKey.Length > 8 ? _apiKey.Substring(0, 8) : "(empty)",
+                    json);
+
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 var request = new HttpRequestMessage(HttpMethod.Post, GraphQlEndpoint)
@@ -228,6 +236,14 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 var httpResponse = await HttpClient.SendAsync(request).ConfigureAwait(false);
                 var responseBody = await httpResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
 
+                this.LogVerbose(
+                    "[OptiSigns] Response: {0} {1} — Status {2} ({3})\nBody:\n{4}",
+                    HttpMethod.Post,
+                    GraphQlEndpoint,
+                    (int)httpResponse.StatusCode,
+                    httpResponse.ReasonPhrase,
+                    responseBody);
+
                 if (!httpResponse.IsSuccessStatusCode)
                 {
                     this.LogError("[OptiSigns] HTTP {0}: {1}", (int)httpResponse.StatusCode, responseBody);
@@ -239,7 +255,13 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 if (envelope?.Errors != null && envelope.Errors.Count > 0)
                 {
                     foreach (var error in envelope.Errors)
-                        this.LogWarning("[OptiSigns] GraphQL error: {0}", error.Message);
+                        this.LogWarning(
+                            "[OptiSigns] GraphQL error: {0}\n  Endpoint: {1}\n  ApiKey: {2}...\n  Request Body: {3}\n  Response Body: {4}",
+                            error.Message,
+                            GraphQlEndpoint,
+                            _apiKey != null && _apiKey.Length > 8 ? _apiKey.Substring(0, 8) : "(empty)",
+                            json,
+                            responseBody);
                     // Return data anyway; partial results are valid in GraphQL
                 }
 
@@ -247,7 +269,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             }
             catch (TaskCanceledException)
             {
-                this.LogWarning("[OptiSigns] Request timed out");
+                this.LogError("[OptiSigns] Request timed out");
                 return null;
             }
             catch (Exception ex)

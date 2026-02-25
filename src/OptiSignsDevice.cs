@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Crestron.SimplSharp;
 using Crestron.SimplSharpPro.DeviceSupport;
+using Newtonsoft.Json;
 using PepperDash.Core;
 using PepperDash.Core.Logging;
 using PepperDash.Essentials.Core;
@@ -143,6 +144,13 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             this.LogInformation("Initializing OptiSigns device. DeviceId={0}, TeamId={1}",
                 _props.DeviceId, _props.TeamId);
 
+            this.LogVerbose(
+                "[OptiSigns] Init config: PollIntervalMs={0}, PlaylistPollIntervalMs={1}, DefaultPlaylistId={2}, StaticPlaylists={3}",
+                _props.PollIntervalMs,
+                _props.PlaylistPollIntervalMs,
+                _props.DefaultPlaylistId ?? "(none)",
+                _playlists.Count);
+
             if (string.IsNullOrEmpty(_props.ApiKey) ||
                 string.IsNullOrEmpty(_props.TeamId) ||
                 string.IsNullOrEmpty(_props.DeviceId))
@@ -192,6 +200,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 if (node == null)
                 {
                     _consecutiveFailures++;
+                    this.LogVerbose(
+                        "[OptiSigns] Status poll returned null. ConsecutiveFailures={0}, MaxBeforeOffline={1}",
+                        _consecutiveFailures, MaxFailuresBeforeOffline);
                     if (_consecutiveFailures >= MaxFailuresBeforeOffline && _isOnline)
                     {
                         _isOnline = false;
@@ -203,6 +214,14 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 }
 
                 _consecutiveFailures = 0;
+
+                this.LogVerbose(
+                    "[OptiSigns] Status poll result: CurrentType={0}, Status={1}, CurrentPlaylistId={2}, LastHeartBeat={3}, DeviceName={4}",
+                    node.CurrentType ?? "(null)",
+                    node.Status ?? "(null)",
+                    node.CurrentPlaylistId ?? "(null)",
+                    node.LastHeartBeat ?? "(null)",
+                    node.DeviceName ?? "(null)");
 
                 if (!_isOnline)
                 {
@@ -218,6 +237,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
                 if (newPowerIsOn != _powerIsOn)
                 {
+                    this.LogVerbose(
+                        "[OptiSigns] Power state changed: {0} -> {1} (currentType={2})",
+                        _powerIsOn, newPowerIsOn, node.CurrentType);
                     _powerIsOn = newPowerIsOn;
                     PowerIsOnFeedback.FireUpdate();
                     PowerIsOffFeedback.FireUpdate();
@@ -229,6 +251,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
                 if (node.CurrentPlaylistId != _currentPlaylistId)
                 {
+                    this.LogVerbose(
+                        "[OptiSigns] Playlist changed: Id={0} -> {1}, Name={2}, Index={3}",
+                        _currentPlaylistId ?? "(null)",
+                        node.CurrentPlaylistId ?? "(null)",
+                        ResolvePlaylistName(node.CurrentPlaylistId),
+                        ResolvePlaylistIndex(node.CurrentPlaylistId));
                     _currentPlaylistId = node.CurrentPlaylistId;
                     _currentPlaylistName = ResolvePlaylistName(_currentPlaylistId);
                     _currentPlaylistIndex = ResolvePlaylistIndex(_currentPlaylistId);
@@ -239,6 +267,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 var mappedStatus = MapDeviceStatus(node.Status);
                 if (mappedStatus != _deviceStatus)
                 {
+                    this.LogVerbose(
+                        "[OptiSigns] Device status changed: {0} -> {1} (raw={2})",
+                        _deviceStatus, mappedStatus, node.Status ?? "(null)");
                     _deviceStatus = mappedStatus;
                     DeviceStatusFeedback.FireUpdate();
                 }
@@ -271,6 +302,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
                 if (apiPlaylists == null)
                 {
+                    this.LogVerbose(
+                        "[OptiSigns] Playlist poll returned null. Keeping {0} existing playlists from config.",
+                        _playlists.Count);
                     // Endpoint may not be live yet (Phase 2 in the OptiSigns SDK).
                     // Log once at debug level; keep the existing (config-provided) list.
                     this.LogDebug(
@@ -292,6 +326,11 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 // Atomic reference swap — safe on CLR without a lock.
                 _playlists = apiPlaylists;
                 this.LogDebug("Playlist list refreshed: {0} playlists", _playlists.Count);
+
+                this.LogVerbose(
+                    "[OptiSigns] Playlist poll result ({0} playlists):\n{1}",
+                    _playlists.Count,
+                    JsonConvert.SerializeObject(_playlists, Formatting.Indented));
 
                 var newIndex = ResolvePlaylistIndex(_currentPlaylistId);
                 if (newIndex != _currentPlaylistIndex)
@@ -356,8 +395,15 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     Type = "NOW"
                 };
 
+                this.LogVerbose(
+                    "[OptiSigns] PowerOnAsync: teamId={0}, payload={1}",
+                    _props.TeamId,
+                    JsonConvert.SerializeObject(payload));
+
                 var success = await _client.PushToScreensAsync(_props.TeamId, payload)
                     .ConfigureAwait(false);
+
+                this.LogVerbose("[OptiSigns] PowerOnAsync result: success={0}", success);
 
                 if (!success)
                     this.LogWarning("PowerOn: pushToScreens returned false for device {0}",
@@ -404,8 +450,16 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             {
                 var payload = new UpdateDeviceInput { CurrentType = "NONE" };
 
+                this.LogVerbose(
+                    "[OptiSigns] PowerOffAsync: deviceId={0}, teamId={1}, payload={2}",
+                    _props.DeviceId,
+                    _props.TeamId,
+                    JsonConvert.SerializeObject(payload));
+
                 var success = await _client.UpdateDeviceAsync(_props.DeviceId, _props.TeamId, payload)
                     .ConfigureAwait(false);
+
+                this.LogVerbose("[OptiSigns] PowerOffAsync result: success={0}", success);
 
                 if (!success)
                     this.LogWarning("PowerOff: updateDevice returned false for device {0}",
@@ -492,8 +546,16 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     Type = "NOW"
                 };
 
+                this.LogVerbose(
+                    "[OptiSigns] SelectPlaylistByIdAsync: teamId={0}, playlistId={1}, payload={2}",
+                    _props.TeamId,
+                    playlistId,
+                    JsonConvert.SerializeObject(payload));
+
                 var success = await _client.PushToScreensAsync(_props.TeamId, payload)
                     .ConfigureAwait(false);
+
+                this.LogVerbose("[OptiSigns] SelectPlaylistByIdAsync result: success={0}", success);
 
                 if (!success)
                     this.LogWarning("SelectPlaylistById: pushToScreens returned false");
