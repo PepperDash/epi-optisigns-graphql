@@ -199,6 +199,23 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         // ──────────────────────────────────────────────
 
         /// <summary>
+        /// Attempts to pretty-print a JSON string for readable log output.
+        /// Returns the original string unchanged if parsing fails.
+        /// </summary>
+        private static string FormatJson(string raw)
+        {
+            try
+            {
+                var obj = JsonConvert.DeserializeObject(raw);
+                return JsonConvert.SerializeObject(obj, Formatting.Indented);
+            }
+            catch
+            {
+                return raw;
+            }
+        }
+
+        /// <summary>
         /// Serializes a GraphQL request, sends it as HTTP POST with Bearer auth,
         /// deserializes the response envelope, and returns the typed data object.
         /// Returns null on any error; all failures are logged but never rethrown.
@@ -227,12 +244,13 @@ Method: {0}
 GraphQL Endpoint: {1}
 Content-Type: application/json
 Authorization: Bearer {2}
-Body: {3}
+Body:
+{3}
 {4}",
                     HttpMethod.Post,
                     GraphQlEndpoint,
                     _apiKey != null && _apiKey.Length > 8 ? _apiKey.Substring(0, 8) : "(empty)",
-                    json,
+                    FormatJson(json),
                     _separator);
 
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -255,13 +273,14 @@ Body: {3}
 Method: {0} 
 GraphQL Endpoint: {1}
 Status: {2} ({3})
-Body: {4}
+Body:
+{4}
 {5}",
                     HttpMethod.Post,
                     GraphQlEndpoint,
                     (int)httpResponse.StatusCode,
                     httpResponse.ReasonPhrase,
-                    responseBody,
+                    FormatJson(responseBody),
                     _separator);
 
                 if (!httpResponse.IsSuccessStatusCode)
@@ -282,14 +301,16 @@ Body: {4}
 {5}
 Endpoint: {1}
 ApiKey: {2}
-Request Body: {3}
-Response Body: {4}
+Request Body:
+{3}
+Response Body:
+{4}
 {5}",
                             error.Message,
                             GraphQlEndpoint,
                             _apiKey != null && _apiKey.Length > 8 ? _apiKey.Substring(0, 8) : "(empty)",
-                            json,
-                            responseBody,
+                            FormatJson(json),
+                            FormatJson(responseBody),
                             _separator);
                     // Return data anyway; partial results are valid in GraphQL
                 }
