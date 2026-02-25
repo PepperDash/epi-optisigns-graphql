@@ -218,7 +218,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 var json = JsonConvert.SerializeObject(requestBody);
 
                 this.LogVerbose(
-                    "[OptiSigns] Request: {0} {1}\nContent-Type: application/json\nAuthorization: Bearer {2}...\nBody:\n{3}",
+                    @"[OptiSigns] Request: 
+Method: {0} 
+GraphQL Endpoint: {1}
+Content-Type: application/json
+Authorization: Bearer {2}
+Body: {3}",
                     HttpMethod.Post,
                     GraphQlEndpoint,
                     _apiKey != null && _apiKey.Length > 8 ? _apiKey.Substring(0, 8) : "(empty)",
@@ -237,7 +242,11 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 var responseBody = await httpResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
 
                 this.LogVerbose(
-                    "[OptiSigns] Response: {0} {1} — Status {2} ({3})\nBody:\n{4}",
+                    @"[OptiSigns] Response: 
+Method: {0} 
+GraphQL Endpoint: {1}
+Status: {2} ({3})
+Body: {4}",
                     HttpMethod.Post,
                     GraphQlEndpoint,
                     (int)httpResponse.StatusCode,
@@ -256,7 +265,11 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 {
                     foreach (var error in envelope.Errors)
                         this.LogWarning(
-                            "[OptiSigns] GraphQL error: {0}\n  Endpoint: {1}\n  ApiKey: {2}...\n  Request Body: {3}\n  Response Body: {4}",
+                            @"[OptiSigns] GraphQL error: {0}
+Endpoint: {1}
+ApiKey: {2}
+Request Body: {3}
+Response Body: {4}",
                             error.Message,
                             GraphQlEndpoint,
                             _apiKey != null && _apiKey.Length > 8 ? _apiKey.Substring(0, 8) : "(empty)",
