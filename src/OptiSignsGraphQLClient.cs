@@ -24,7 +24,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
     /// The static HttpClient is intentional: reusing a single instance avoids socket
     /// exhaustion from repeated connection teardown, which matters on embedded processors.
     /// </summary>
-    internal class OptiSignsGraphQLClient : IKeyed
+    public class OptiSignsGraphQLClient : IKeyed
     {
         private readonly string _separator = new string('-', 50);
         public string Key { get; private set; }

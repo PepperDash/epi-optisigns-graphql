@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using Crestron.SimplSharp;
 using Crestron.SimplSharpPro.DeviceSupport;
 using Newtonsoft.Json;
@@ -14,24 +13,22 @@ using PepperDash.Essentials.Core.Bridges;
 namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 {
     /// <summary>
-    /// PepperDash Essentials bridgeable device for OptiSigns digital signage.
+    /// PepperDash Essentials bridgeable device for an individual OptiSigns player (screen).
     ///
     /// Maps AV-style power and input-select operations to the OptiSigns GraphQL API:
     ///   Power OFF  ->  updateDevice  (currentType: "NONE")       Blanks the screen
     ///   Power ON   ->  pushToScreens (restores last/default playlist, type: "NOW")
     ///   Input N    ->  pushToScreens (currentPlaylistId: id, type: "NOW")
     ///
-    /// Two independent CTimer instances run concurrently:
-    ///   Status poll   (default 30s):  queries device currentType / status / heartbeat
-    ///   Playlist poll (default 5min): queries the full account playlist list for labels
-    ///
-    /// Control operations apply optimistic UI updates immediately, then schedule a
-    /// confirmation poll 2 seconds later to reconcile with the actual API state.
+    /// The player receives its GraphQL client and poll intervals from the parent server.
+    /// Each player maintains its own state and is independently bridgeable.
     /// </summary>
-    public class OptiSignsDevice : EssentialsBridgeableDevice
+    public class OptiSignsPlayer : EssentialsBridgeableDevice
     {
-        private readonly OptiSignsPropertiesConfig _props;
+        private readonly OptiSignsPlayerConfig _playerConfig;
         private readonly OptiSignsGraphQLClient _client;
+        private readonly int _pollIntervalMs;
+        private readonly int _playlistPollIntervalMs;
 
         // ──────────────────────────────────────────────
         // Internal state
@@ -84,16 +81,33 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         // Constructor
         // ──────────────────────────────────────────────
 
-        public OptiSignsDevice(string key, string name, OptiSignsPropertiesConfig props)
+        /// <summary>
+        /// Creates a new OptiSigns player instance.
+        /// </summary>
+        /// <param name="key">Unique device key (e.g., "optisign-server-player-1")</param>
+        /// <param name="name">Display name for the player</param>
+        /// <param name="playerConfig">Player-specific configuration</param>
+        /// <param name="client">Shared GraphQL client from the parent server</param>
+        /// <param name="pollIntervalMs">Status poll interval in milliseconds</param>
+        /// <param name="playlistPollIntervalMs">Playlist poll interval in milliseconds</param>
+        public OptiSignsPlayer(
+            string key,
+            string name,
+            OptiSignsPlayerConfig playerConfig,
+            OptiSignsGraphQLClient client,
+            int pollIntervalMs,
+            int playlistPollIntervalMs)
             : base(key, name)
         {
-            _props = props;
-            _client = new OptiSignsGraphQLClient(Key, props.ApiKey);
+            _playerConfig = playerConfig;
+            _client = client;
+            _pollIntervalMs = pollIntervalMs;
+            _playlistPollIntervalMs = playlistPollIntervalMs;
 
             // Seed from static config so labels are available before the first API poll.
-            if (_props.Playlists != null && _props.Playlists.Count > 0)
+            if (_playerConfig.Playlists != null && _playerConfig.Playlists.Count > 0)
             {
-                _playlists = _props.Playlists
+                _playlists = _playerConfig.Playlists
                     .Select(p => new PlaylistNode { Id = p.Id, Name = p.Name })
                     .ToList();
             }
@@ -118,8 +132,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 () => Math.Min(_playlists.Count, MaxPlaylistBridgeCount));
 
             // One feedback per bridged slot (0-based index, 0 = playlist 1 on the SIMPL side).
-            // Each lambda captures its index at construction time via a local copy (capturedI),
-            // avoiding the classic C# loop-closure pitfall.
             PlaylistNameFeedbacks = new StringFeedback[MaxPlaylistBridgeCount];
             for (var i = 0; i < MaxPlaylistBridgeCount; i++)
             {
@@ -134,45 +146,40 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         // ──────────────────────────────────────────────
         // Initialization
-        // Called by Essentials after the device is constructed and the config is loaded.
         // ──────────────────────────────────────────────
 
         public override void Initialize()
         {
             base.Initialize();
 
-            this.LogInformation("Initializing OptiSigns device. DeviceId={0}, TeamId={1}",
-                _props.DeviceId, _props.TeamId);
+            this.LogInformation("Initializing OptiSigns player. DeviceId={0}, TeamId={1}",
+                _playerConfig.DeviceId, _playerConfig.TeamId);
 
             this.LogVerbose(
-                "[OptiSigns] Init config: PollIntervalMs={0}, PlaylistPollIntervalMs={1}, DefaultPlaylistId={2}, StaticPlaylists={3}",
-                _props.PollIntervalMs,
-                _props.PlaylistPollIntervalMs,
-                _props.DefaultPlaylistId ?? "(none)",
+                "[OptiSigns] Player init config: PollIntervalMs={0}, PlaylistPollIntervalMs={1}, DefaultPlaylistId={2}, StaticPlaylists={3}",
+                _pollIntervalMs,
+                _playlistPollIntervalMs,
+                _playerConfig.DefaultPlaylistId ?? "(none)",
                 _playlists.Count);
 
-            if (string.IsNullOrEmpty(_props.ApiKey) ||
-                string.IsNullOrEmpty(_props.TeamId) ||
-                string.IsNullOrEmpty(_props.DeviceId))
+            if (string.IsNullOrEmpty(_playerConfig.TeamId) ||
+                string.IsNullOrEmpty(_playerConfig.DeviceId))
             {
-                this.LogError("Required configuration missing (apiKey / teamId / deviceId). Device will not poll.");
+                this.LogError("Required configuration missing (teamId / deviceId). Player will not poll.");
                 return;
             }
 
             // Playlist poll fires immediately (dueTime=0) so labels are ready before the UI appears.
             _playlistPollTimer = new CTimer(
-                PlaylistPollTimerCallback, null, 0, _props.PlaylistPollIntervalMs);
+                PlaylistPollTimerCallback, null, 0, _playlistPollIntervalMs);
 
             // Status poll starts 2 seconds later to let the playlist poll finish first.
             _statusPollTimer = new CTimer(
-                StatusPollTimerCallback, null, 2000, _props.PollIntervalMs);
+                StatusPollTimerCallback, null, 2000, _pollIntervalMs);
         }
 
         // ──────────────────────────────────────────────
         // Timer callbacks
-        // These run on a Crestron system timer thread.
-        // All async I/O is dispatched via CrestronInvoke.BeginInvoke to avoid
-        // blocking the timer thread and to comply with Crestron threading rules.
         // ──────────────────────────────────────────────
 
         private void StatusPollTimerCallback(object notUsed)
@@ -194,7 +201,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             SetPolling(true);
             try
             {
-                var node = await _client.GetDeviceStatusAsync(_props.DeviceId)
+                var node = await _client.GetDeviceStatusAsync(_playerConfig.DeviceId)
                     .ConfigureAwait(false);
 
                 if (node == null)
@@ -207,7 +214,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     {
                         _isOnline = false;
                         IsOnlineFeedback.FireUpdate();
-                        this.LogWarning("OptiSigns device offline after {0} consecutive failures",
+                        this.LogWarning("OptiSigns player offline after {0} consecutive failures",
                             _consecutiveFailures);
                     }
                     return;
@@ -227,7 +234,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 {
                     _isOnline = true;
                     IsOnlineFeedback.FireUpdate();
-                    this.LogInformation("OptiSigns device is online");
+                    this.LogInformation("OptiSigns player is online");
                 }
 
                 _currentType = node.CurrentType;
@@ -305,8 +312,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     this.LogVerbose(
                         "[OptiSigns] Playlist poll returned null. Keeping {0} existing playlists from config.",
                         _playlists.Count);
-                    // Endpoint may not be live yet (Phase 2 in the OptiSigns SDK).
-                    // Log once at debug level; keep the existing (config-provided) list.
                     this.LogDebug(
                         "Playlist API returned null — using config-provided list ({0} items)",
                         _playlists.Count);
@@ -367,7 +372,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         public void PowerOn()
         {
             var playlistId = _lastActivePlaylistId
-                ?? _props.DefaultPlaylistId
+                ?? _playerConfig.DefaultPlaylistId
                 ?? (_playlists.Count > 0 ? _playlists[0].Id : null);
 
             if (string.IsNullOrEmpty(playlistId))
@@ -390,24 +395,24 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             {
                 var payload = new PushToScreensInput
                 {
-                    DeviceIds = new List<string> { _props.DeviceId },
+                    DeviceIds = new List<string> { _playerConfig.DeviceId },
                     CurrentPlaylistId = playlistId,
                     Type = "NOW"
                 };
 
                 this.LogVerbose(
                     "[OptiSigns] PowerOnAsync: teamId={0}, payload={1}",
-                    _props.TeamId,
+                    _playerConfig.TeamId,
                     JsonConvert.SerializeObject(payload));
 
-                var success = await _client.PushToScreensAsync(_props.TeamId, payload)
+                var success = await _client.PushToScreensAsync(_playerConfig.TeamId, payload)
                     .ConfigureAwait(false);
 
                 this.LogVerbose("[OptiSigns] PowerOnAsync result: success={0}", success);
 
                 if (!success)
                     this.LogWarning("PowerOn: pushToScreens returned false for device {0}",
-                        _props.DeviceId);
+                        _playerConfig.DeviceId);
 
                 ScheduleConfirmationPoll();
             }
@@ -427,7 +432,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// </summary>
         public void PowerOff()
         {
-            this.LogInformation("PowerOff: setting currentType=NONE for device {0}", _props.DeviceId);
+            this.LogInformation("PowerOff: setting currentType=NONE for device {0}", _playerConfig.DeviceId);
 
             if (!string.IsNullOrEmpty(_currentPlaylistId))
                 _lastActivePlaylistId = _currentPlaylistId;
@@ -452,18 +457,18 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
                 this.LogVerbose(
                     "[OptiSigns] PowerOffAsync: deviceId={0}, teamId={1}, payload={2}",
-                    _props.DeviceId,
-                    _props.TeamId,
+                    _playerConfig.DeviceId,
+                    _playerConfig.TeamId,
                     JsonConvert.SerializeObject(payload));
 
-                var success = await _client.UpdateDeviceAsync(_props.DeviceId, _props.TeamId, payload)
+                var success = await _client.UpdateDeviceAsync(_playerConfig.DeviceId, _playerConfig.TeamId, payload)
                     .ConfigureAwait(false);
 
                 this.LogVerbose("[OptiSigns] PowerOffAsync result: success={0}", success);
 
                 if (!success)
                     this.LogWarning("PowerOff: updateDevice returned false for device {0}",
-                        _props.DeviceId);
+                        _playerConfig.DeviceId);
 
                 ScheduleConfirmationPoll();
             }
@@ -516,8 +521,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         /// <summary>
         /// Selects a playlist by its OptiSigns MongoDB _id string.
-        /// This is also the handler for the SelectPlaylistById serial join from SIMPL,
-        /// allowing config-driven room logic without needing a numeric index.
         /// </summary>
         public void SelectPlaylistById(string playlistId)
         {
@@ -541,18 +544,18 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             {
                 var payload = new PushToScreensInput
                 {
-                    DeviceIds = new List<string> { _props.DeviceId },
+                    DeviceIds = new List<string> { _playerConfig.DeviceId },
                     CurrentPlaylistId = playlistId,
                     Type = "NOW"
                 };
 
                 this.LogVerbose(
                     "[OptiSigns] SelectPlaylistByIdAsync: teamId={0}, playlistId={1}, payload={2}",
-                    _props.TeamId,
+                    _playerConfig.TeamId,
                     playlistId,
                     JsonConvert.SerializeObject(payload));
 
-                var success = await _client.PushToScreensAsync(_props.TeamId, payload)
+                var success = await _client.PushToScreensAsync(_playerConfig.TeamId, payload)
                     .ConfigureAwait(false);
 
                 this.LogVerbose("[OptiSigns] SelectPlaylistByIdAsync result: success={0}", success);
@@ -576,10 +579,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         // Helpers
         // ──────────────────────────────────────────────
 
-        /// <summary>
-        /// Applies an optimistic UI state for a playlist selection before the API responds.
-        /// This gives the control panel immediate visual feedback.
-        /// </summary>
         private void ApplyOptimisticPlaylistState(string playlistId, bool powerOn)
         {
             if (powerOn != _powerIsOn)
@@ -596,10 +595,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             InputSelectFeedback.FireUpdate();
         }
 
-        /// <summary>
-        /// Schedules a status poll 2 seconds after a control command, to confirm the
-        /// API accepted the change and reconcile any difference from optimistic state.
-        /// </summary>
         private void ScheduleConfirmationPoll()
         {
             new CTimer(_ => CrestronInvoke.BeginInvoke(__ => PollDeviceStatusAsync()), 2000);
@@ -637,10 +632,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             return sb.ToString();
         }
 
-        /// <summary>
-        /// Maps the raw OptiSigns API status string to an analog value.
-        /// 0 = StatusUnknown, 1 = IsOk (ONLINE), 2 = InWarning (SLEEP), 3 = InError (OFFLINE).
-        /// </summary>
         private static int MapDeviceStatus(string status)
         {
             if (string.IsNullOrEmpty(status)) return 0;
@@ -661,10 +652,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             IsPollingFeedback.FireUpdate();
         }
 
-        /// <summary>
-        /// Fires PlaylistCountFeedback and all 30 PlaylistNameFeedbacks.
-        /// Called whenever the _playlists list changes (poll result or startup seed).
-        /// </summary>
         private void FirePlaylistNameFeedbacks()
         {
             PlaylistCountFeedback.FireUpdate();
@@ -689,7 +676,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         // ──────────────────────────────────────────────
         // IBridgeAdvanced — LinkToApi
-        // Connects Essentials feedback and control objects to the EISC bridge signals.
         // ──────────────────────────────────────────────
 
         public override void LinkToApi(BasicTriList trilist, uint joinStart,
@@ -737,7 +723,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 trilist.StringInput[joinMap.LastHeartBeat.JoinNumber]);
 
             // ── Serial: PlaylistNames span (S11-S40) ──────────────────
-            // PlaylistNames.JoinNumber = 11; wires slot 0 → S11, slot 1 → S12 … slot 29 → S40.
             for (uint i = 0; i < MaxPlaylistBridgeCount; i++)
             {
                 PlaylistNameFeedbacks[i].LinkInputSig(
