@@ -29,6 +29,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         private readonly OptiSignsGraphQLClient _client;
         private readonly int _pollIntervalMs;
         private readonly int _playlistPollIntervalMs;
+        private readonly bool _usePushToScreens;
 
         // ──────────────────────────────────────────────
         // Internal state
@@ -91,20 +92,22 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// <param name="client">Shared GraphQL client from the parent server</param>
         /// <param name="pollIntervalMs">Status poll interval in milliseconds</param>
         /// <param name="playlistPollIntervalMs">Playlist poll interval in milliseconds</param>
+        /// <param name="usePushToScreens">When true, uses pushToScreens mutation; otherwise uses updateDevice</param>
         public OptiSignsPlayer(
             string key,
             string name,
             OptiSignsPlayerConfig playerConfig,
             OptiSignsGraphQLClient client,
             int pollIntervalMs,
-            int playlistPollIntervalMs)
+            int playlistPollIntervalMs,
+            bool usePushToScreens = false)
             : base(key, name)
         {
             _playerConfig = playerConfig;
             _client = client;
             _pollIntervalMs = pollIntervalMs;
             _playlistPollIntervalMs = playlistPollIntervalMs;
-
+            _usePushToScreens = usePushToScreens;
             // Seed from static config so labels are available before the first API poll.
             if (_playerConfig.Playlists != null && _playerConfig.Playlists.Count > 0)
             {
@@ -555,26 +558,47 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             SetPolling(true);
             try
             {
-                var payload = new PushToScreensInput
+                bool success;
+
+                if (_usePushToScreens)
                 {
-                    DeviceIds = new List<string> { _playerConfig.DeviceId },
-                    CurrentPlaylistId = playlistId,
-                    Type = "NOW"
-                };
+                    // Use pushToScreens mutation (Phase 2 SDK method)
+                    var payload = new PushToScreensInput
+                    {
+                        DeviceIds = new List<string> { _playerConfig.DeviceId },
+                        CurrentPlaylistId = playlistId,
+                        Type = "NOW"
+                    };
 
-                this.LogVerbose(
-                    "[OptiSigns] SelectPlaylistByIdAsync: teamId={0}, playlistId={1}, payload={2}",
-                    _playerConfig.TeamId,
-                    playlistId,
-                    JsonConvert.SerializeObject(payload));
+                    this.LogVerbose(
+                        "[OptiSigns] SelectPlaylistByIdAsync (pushToScreens): teamId={0}, playlistId={1}, payload={2}",
+                        _playerConfig.TeamId,
+                        playlistId,
+                        JsonConvert.SerializeObject(payload));
 
-                var success = await _client.PushToScreensAsync(_playerConfig.TeamId, payload)
-                    .ConfigureAwait(false);
+                    success = await _client.PushToScreensAsync(_playerConfig.TeamId, payload)
+                        .ConfigureAwait(false);
+                }
+                else
+                {
+                    // Use updateDevice mutation (documented API method)
+                    // Sets currentType=PLAYLIST and currentAssetId=playlistId
+                    this.LogVerbose(
+                        "[OptiSigns] SelectPlaylistByIdAsync (updateDevice): deviceId={0}, teamId={1}, playlistId={2}",
+                        _playerConfig.DeviceId,
+                        _playerConfig.TeamId,
+                        playlistId);
+
+                    success = await _client.AssignPlaylistAsync(
+                        _playerConfig.DeviceId,
+                        _playerConfig.TeamId,
+                        playlistId).ConfigureAwait(false);
+                }
 
                 this.LogVerbose("[OptiSigns] SelectPlaylistByIdAsync result: success={0}", success);
 
                 if (!success)
-                    this.LogWarning("SelectPlaylistById: pushToScreens returned false");
+                    this.LogWarning("SelectPlaylistById: API call returned false");
 
                 ScheduleConfirmationPoll();
             }

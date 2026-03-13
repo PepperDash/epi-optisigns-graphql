@@ -199,6 +199,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         [JsonProperty("currentPlaylistId")]
         public string CurrentPlaylistId { get; set; }
+
+        [JsonProperty("currentAssetId")]
+        public string CurrentAssetId { get; set; }
     }
 
     /// <summary>

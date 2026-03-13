@@ -110,6 +110,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     _id
                     currentType
                     currentPlaylistId
+                    currentAssetId
                 }
             }";
 
@@ -214,6 +215,25 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 .ConfigureAwait(false);
 
             return !string.IsNullOrEmpty(data?.UpdateDevice?.Id);
+        }
+
+        /// <summary>
+        /// Assigns a playlist to a device using the updateDevice mutation.
+        /// Per API docs: sets currentType=PLAYLIST and currentAssetId=playlistId.
+        /// This is the documented method for assigning playlist content to a screen.
+        /// </summary>
+        public async Task<bool> AssignPlaylistAsync(
+            string deviceId,
+            string teamId,
+            string playlistId)
+        {
+            var payload = new UpdateDeviceInput
+            {
+                CurrentType = "PLAYLIST",
+                CurrentAssetId = playlistId
+            };
+
+            return await UpdateDeviceAsync(deviceId, teamId, payload).ConfigureAwait(false);
         }
 
         /// <summary>
