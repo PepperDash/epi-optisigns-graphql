@@ -119,7 +119,11 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             IsPollingFeedback = new BoolFeedback(key + "-IsPolling", () => _isPolling);
             InputSelectFeedback = new IntFeedback(key + "-InputSelect", () => _currentPlaylistIndex);
             DeviceNameFeedback = new StringFeedback(key + "-DeviceName", 
-                () => !string.IsNullOrEmpty(_deviceName) ? _deviceName : Name);
+                () => !string.IsNullOrEmpty(_deviceName) 
+                    ? _deviceName 
+                    : !string.IsNullOrEmpty(_playerConfig.Name) 
+                        ? _playerConfig.Name 
+                        : Name);
             CurrentPlaylistNameFeedback = new StringFeedback(
                 key + "-CurrentPlaylist", () => _currentPlaylistName ?? string.Empty);
             DeviceStatusFeedback = new IntFeedback(

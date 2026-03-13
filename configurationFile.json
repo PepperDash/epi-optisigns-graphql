@@ -18,6 +18,7 @@
 					"players": [
 						{
 							"key": "player1",
+							"name": "Player 1",
 							"deviceId": "DEVICE_ID_123",
 							"teamId": "TEAM_ID_123",
 							"defaultPlaylistId": "PLAYLIST_ID_1",
@@ -31,8 +32,8 @@
 				}
 			},
 			{
-				"key": "eiscBridge-signage",
-				"name": "Signage EISC Bridge",
+				"key": "devices-io-bridge",
+				"name": "Devices IO Bridge",
 				"type": "eiscApiAdvanced",
 				"group": "api",
 				"uid": 2,
