@@ -17,8 +17,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
     /// Digital 6   IsPolling           ToSIMPL      High while an async API call is in progress
     ///
     /// Analog  1   DeviceStatus        ToSIMPL      0=Unknown, 1=Ok, 2=Warning, 3=Error
-    /// Analog  5   PlaylistCount       ToSIMPL      Number of playlists available (capped at 30)
-    /// Analog  6   SelectPlaylistByIndex ToFromSIMPL 1-based playlist index; 0 = unknown/off
+    /// Analog  5   PlaylistCount       ToSIMPL      Total number of playlists available
+    /// Analog  6   SelectPlaylistByIndex ToFromSIMPL Page-relative 1-based index; 0 = not on page
     ///
     /// Serial  1   DeviceName          ToSIMPL      Plugin device name (from Essentials config)
     /// Serial  2   LastHeartBeat       ToSIMPL      ISO 8601 timestamp of last device heartbeat
@@ -165,8 +165,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             new JoinData { JoinNumber = 5, JoinSpan = 1 },
             new JoinMetadata
             {
-                Description = "Number of playlists currently available, capped at 30. " +
-                              "Use this to know how many PlaylistName[N] serial joins are populated.",
+                Description = "Total number of playlists available. " +
+                              "Use pagination (D6-D8) to navigate when count exceeds 30.",
                 JoinCapabilities = eJoinCapabilities.ToSIMPL,
                 JoinType = eJoinType.Analog
             });
@@ -176,11 +176,10 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             new JoinData { JoinNumber = 6, JoinSpan = 1 },
             new JoinMetadata
             {
-                Description = "1-based index into the available playlist list. " +
-                              "Send an index from SIMPL to select that playlist. " +
-                              "Feedback reflects the currently active playlist. " +
-                              "Value of 0 means no playlist is active or the current playlist " +
-                              "is not in the known list.",
+                Description = "Page-relative 1-based index. Send from SIMPL to select a playlist " +
+                              "on the current page. On page 2, sending 5 selects playlist 35. " +
+                              "Feedback shows the current playlist's index on this page, or 0 " +
+                              "if the current playlist is not on the visible page.",
                 JoinCapabilities = eJoinCapabilities.ToFromSIMPL,
                 JoinType = eJoinType.Analog
             });

@@ -120,7 +120,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             PowerIsOnFeedback = new BoolFeedback(key + "-PowerIsOn", () => _powerIsOn);
             PowerIsOffFeedback = new BoolFeedback(key + "-PowerIsOff", () => !_powerIsOn);
             IsPollingFeedback = new BoolFeedback(key + "-IsPolling", () => _isPolling);
-            InputSelectFeedback = new IntFeedback(key + "-InputSelect", () => _currentPlaylistIndex);
+            InputSelectFeedback = new IntFeedback(key + "-InputSelect", () => GetPageRelativePlaylistIndex());
             DeviceNameFeedback = new StringFeedback(key + "-DeviceName", 
                 () => !string.IsNullOrEmpty(_deviceName) 
                     ? _deviceName 
@@ -510,8 +510,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         // ──────────────────────────────────────────────
 
         /// <summary>
-        /// Selects a playlist by its 1-based index in the resolved playlist list.
+        /// Selects a playlist by its 1-based index relative to the current page.
         /// This is the handler for the InputSelect analog join from SIMPL.
+        /// When on page 2 (offset 30), entering index 5 selects playlist 35.
         /// </summary>
         public void SelectPlaylistByIndex(ushort index)
         {
@@ -521,16 +522,26 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 return;
             }
 
-            if (index < 1 || index > _playlists.Count)
+            if (index < 1 || index > MaxPlaylistBridgeCount)
             {
                 this.LogWarning("SelectPlaylistByIndex({0}): out of range (1-{1})",
-                    index, _playlists.Count);
+                    index, MaxPlaylistBridgeCount);
                 return;
             }
 
-            var playlist = _playlists[index - 1];
-            this.LogDebug("SelectPlaylistByIndex({0}): '{1}' (id={2})",
-                index, playlist.Name, playlist.Id);
+            // Calculate actual index accounting for current page offset
+            var actualIndex = _playlistGroupOffset + index - 1;
+
+            if (actualIndex >= _playlists.Count)
+            {
+                this.LogWarning("SelectPlaylistByIndex({0}): actual index {1} exceeds playlist count {2}",
+                    index, actualIndex + 1, _playlists.Count);
+                return;
+            }
+
+            var playlist = _playlists[actualIndex];
+            this.LogDebug("SelectPlaylistByIndex({0}): page offset={1}, actual index={2}, '{3}' (id={4})",
+                index, _playlistGroupOffset, actualIndex + 1, playlist.Name, playlist.Id);
 
             SelectPlaylistById(playlist.Id);
         }
@@ -655,6 +666,24 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             return 0;
         }
 
+        /// <summary>
+        /// Returns the current playlist's index relative to the current page.
+        /// Returns 0 if the playlist is not on the current page or unknown.
+        /// </summary>
+        private int GetPageRelativePlaylistIndex()
+        {
+            if (_currentPlaylistIndex == 0) return 0;
+
+            // Check if current playlist is on this page
+            var pageStart = _playlistGroupOffset + 1; // 1-based
+            var pageEnd = _playlistGroupOffset + MaxPlaylistBridgeCount;
+
+            if (_currentPlaylistIndex >= pageStart && _currentPlaylistIndex <= pageEnd)
+                return _currentPlaylistIndex - _playlistGroupOffset;
+
+            return 0; // Current playlist not on this page
+        }
+
         private static int MapDeviceStatus(string status)
         {
             if (string.IsNullOrEmpty(status)) return 0;
@@ -696,6 +725,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             _playlistGroupOffset = 0;
             this.LogDebug("FirstPlaylistPage: offset now 0");
             FirePlaylistNameFeedbacks();
+            InputSelectFeedback.FireUpdate();
         }
 
         /// <summary>
@@ -712,6 +742,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             _playlistGroupOffset += MaxPlaylistBridgeCount;
             this.LogDebug("NextPlaylistPage: offset now {0}", _playlistGroupOffset);
             FirePlaylistNameFeedbacks();
+            InputSelectFeedback.FireUpdate();
         }
 
         /// <summary>
@@ -728,6 +759,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             _playlistGroupOffset = Math.Max(0, _playlistGroupOffset - MaxPlaylistBridgeCount);
             this.LogDebug("PreviousPlaylistPage: offset now {0}", _playlistGroupOffset);
             FirePlaylistNameFeedbacks();
+            InputSelectFeedback.FireUpdate();
         }
 
         private void FireAllFeedbacks()
