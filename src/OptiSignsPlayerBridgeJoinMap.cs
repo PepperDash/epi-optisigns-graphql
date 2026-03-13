@@ -13,8 +13,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
     /// Digital 3   PowerOff            FromSIMPL    Pulse to power off (sets currentType = NONE)
     /// Digital 3   PowerIsOff          ToSIMPL      High when currentType == NONE
     /// Digital 4   PowerToggle         FromSIMPL    Pulse to toggle power state
-    /// Digital 5   PollNow             FromSIMPL    Pulse to trigger an immediate status poll
-    /// Digital 6   IsPolling           ToSIMPL      High while an async API call is in progress
+    /// Digital 5   PollNow             FromSIMPL    Pulse to trigger status + playlist poll
+    /// Digital 5   IsPolling           ToSIMPL      High while an async API call is in progress
     ///
     /// Analog  1   DeviceStatus        ToSIMPL      0=Unknown, 1=Ok, 2=Warning, 3=Error
     /// Analog  5   PlaylistCount       ToSIMPL      Total number of playlists available
@@ -99,7 +99,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             new JoinData { JoinNumber = 5, JoinSpan = 1 },
             new JoinMetadata
             {
-                Description = "Pulse from SIMPL to trigger an immediate device status poll.",
+                Description = "Pulse from SIMPL to trigger an immediate device status and playlist poll.",
                 JoinCapabilities = eJoinCapabilities.FromSIMPL,
                 JoinType = eJoinType.Digital
             });

@@ -505,6 +505,19 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             else PowerOn();
         }
 
+        /// <summary>
+        /// Triggers an immediate poll of both device status and playlist list.
+        /// </summary>
+        public void PollNow()
+        {
+            this.LogDebug("PollNow: triggering device status and playlist polls");
+            CrestronInvoke.BeginInvoke(_ =>
+            {
+                PollDeviceStatusAsync();
+                PollPlaylistsAsync();
+            });
+        }
+
         // ──────────────────────────────────────────────
         // Playlist / input selection
         // ──────────────────────────────────────────────
@@ -804,8 +817,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             trilist.SetSigTrueAction(joinMap.PowerOn.JoinNumber, PowerOn);
             trilist.SetSigTrueAction(joinMap.PowerOff.JoinNumber, PowerOff);
             trilist.SetSigTrueAction(joinMap.PowerToggle.JoinNumber, PowerToggle);
-            trilist.SetSigTrueAction(joinMap.PollNow.JoinNumber,
-                () => CrestronInvoke.BeginInvoke(_ => PollDeviceStatusAsync()));
+            trilist.SetSigTrueAction(joinMap.PollNow.JoinNumber, PollNow);
             trilist.SetSigTrueAction(joinMap.PageFirst.JoinNumber, FirstPlaylistPage);
             trilist.SetSigTrueAction(joinMap.PageNext.JoinNumber, NextPlaylistPage);
             trilist.SetSigTrueAction(joinMap.PreviousPage.JoinNumber, PreviousPlaylistPage);

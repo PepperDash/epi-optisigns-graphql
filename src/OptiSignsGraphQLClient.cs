@@ -115,12 +115,10 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             }";
 
         // pushToScreens is defined in the GraphQL schema but is Phase 2 in the SDK.
-        // We call it here directly via raw HTTP.
+        // Returns JSONObject! which is a scalar - no subfields can be selected.
         private static readonly string PushToScreensMutation =
             @"mutation PushToScreens($force: Boolean, $payload: PushToScreensInput!, $teamId: String!) {
-                pushToScreens(force: $force, payload: $payload, teamId: $teamId) {
-                    status
-                }
+                pushToScreens(force: $force, payload: $payload, teamId: $teamId)
             }";
 
         // ──────────────────────────────────────────────
@@ -239,7 +237,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// <summary>
         /// Pushes content to the screen via the pushToScreens mutation.
         /// Called for power on (restore playlist) and playlist selection.
-        /// Returns true if the mutation returned a boolean true.
+        /// Returns true if the mutation executes successfully (data is returned).
+        /// The mutation returns JSONObject! which may contain a status field.
         /// </summary>
         public async Task<bool> PushToScreensAsync(
             string teamId,
@@ -256,7 +255,17 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             var data = await ExecuteAsync<PushToScreensMutationData>(PushToScreensMutation, variables)
                 .ConfigureAwait(false);
 
-            return data?.PushToScreens?.Status == true;
+            // JSONObject! returns a JObject - check if it has a status field
+            if (data?.PushToScreens == null)
+                return false;
+
+            // Try to get status from the returned JSON object
+            var statusToken = data.PushToScreens["status"];
+            if (statusToken != null)
+                return statusToken.ToObject<bool>();
+
+            // If no status field, consider success if we got any response
+            return true;
         }
 
         // ──────────────────────────────────────────────

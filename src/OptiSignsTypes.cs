@@ -245,15 +245,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
     internal class PushToScreensMutationData
     {
-        // The mutation returns an object with a status boolean
+        // The mutation returns JSONObject! which is a scalar containing the response
         [JsonProperty("pushToScreens")]
-        public PushToScreensResult PushToScreens { get; set; }
-    }
-
-    internal class PushToScreensResult
-    {
-        [JsonProperty("status")]
-        public bool? Status { get; set; }
+        public Newtonsoft.Json.Linq.JObject PushToScreens { get; set; }
     }
 
     /// <summary>
