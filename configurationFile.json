@@ -1,63 +1,45 @@
 {
 	"system": {
-		"name": "OptiSigns Integration Demo",
-		"license": ""
+		"info": {}
 	},
-	"devices": [
-		{
-			"key": "optiSigns-lobby",
-			"name": "Lobby Digital Sign",
-			"type": "optiSigns",
-			"group": "signage",
-			"uid": 1,
-			"properties": {
-				"apiKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZWFtSWQiOiI2NWEzYjJjMWQ0ZTVmNjAwMTIzNDU2NzgiLCJpYXQiOjE3MDUyMDAwMDB9.abcdefghijklmnopqrstuvwxyz1234567890ABCDEFG",
-				"teamId": "65a3b2c1d4e5f60012345678",
-				"deviceId": "64f1a9e8b3c2d70098765432",
-				"pollIntervalMs": 30000,
-				"playlistPollIntervalMs": 300000,
-				"defaultPlaylistId": "PLAYLIST_ID_1",
-				"playlists": [
-					{
-						"id": "PLAYLIST_ID_1",
-						"name": "Welcome Loop"
-					},
-					{
-						"id": "PLAYLIST_ID_2",
-						"name": "Event Content"
-					},
-					{
-						"id": "PLAYLIST_ID_3",
-						"name": "Emergency Messaging"
-					}
-				]
+	"template": {
+		"info": {},
+		"devices": [
+			{
+				"key": "lobby-ds-player-1",
+				"name": "Lobby Digital Sign",
+				"type": "optiSigns",
+				"group": "signage",
+				"uid": 1,
+				"properties": {
+					"apiKey": "API_KEY_123",
+					"teamId": "TEAM_ID_123",
+					"deviceId": "DEVICE_ID_123",
+					"pollIntervalMs": 30000,
+					"playlistPollIntervalMs": 300000,
+					"defaultPlaylistId": "PLAYLIST_ID_1",
+					"playlists": [
+						{ "id": "PLAYLIST_ID_1", "name": "Welcome Loop"        },
+						{ "id": "PLAYLIST_ID_2", "name": "Event Content"       },
+						{ "id": "PLAYLIST_ID_3", "name": "Emergency Messaging" }
+					]
+				}
+			},
+			{
+				"key": "eiscBridge-signage",
+				"name": "Signage EISC Bridge",
+				"type": "eiscApiAdvanced",
+				"group": "api",
+				"uid": 2,
+				"properties": {
+					"control": { "method": "ipidTcp", "ipid": "A7", "tcpSshProperties": { "address": "127.0.0.2", "port": 0 } },
+					"devices": [ { "deviceKey": "lobby-ds-player-1", "joinStart": 401 } ]
+				}
 			}
-		},
-		{
-			"key": "eiscBridge-signage",
-			"name": "Signage EISC Bridge",
-			"type": "eiscApiAdvanced",
-			"group": "api",
-			"uid": 2,
-			"properties": {
-				"control": {
-					"method": "ipidTcp",
-					"ipid": "A0",
-					"tcpSshProperties": {
-						"address": "127.0.0.2",
-						"port": 0
-					}
-				},
-				"devices": [
-					{
-						"deviceKey": "optiSigns-lobby",
-						"joinStart": 1
-					}
-				]
-			}
-		}
-	],
-	"rooms": [],
-	"sourceListKey": "",
-	"tieLines": []
+		],
+		"rooms": [],
+		"tieLines": []
+	},
+	"system_url": "",
+	"template_url": ""
 }
