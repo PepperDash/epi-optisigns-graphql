@@ -142,7 +142,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         public string Name { get; set; }
 
         [JsonProperty("totalDuration")]
-        public int? TotalDuration { get; set; }
+        public long? TotalDuration { get; set; }
 
         [JsonProperty("tags")]
         public List<string> Tags { get; set; }
@@ -212,9 +212,15 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
     internal class PushToScreensMutationData
     {
-        // The mutation returns a Boolean scalar
+        // The mutation returns an object with a status boolean
         [JsonProperty("pushToScreens")]
-        public bool? PushToScreens { get; set; }
+        public PushToScreensResult PushToScreens { get; set; }
+    }
+
+    internal class PushToScreensResult
+    {
+        [JsonProperty("status")]
+        public bool? Status { get; set; }
     }
 
     /// <summary>

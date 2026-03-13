@@ -95,7 +95,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         // We call it here directly via raw HTTP.
         private static readonly string PushToScreensMutation =
             @"mutation PushToScreens($force: Boolean, $payload: PushToScreensInput!, $teamId: String!) {
-                pushToScreens(force: $force, payload: $payload, teamId: $teamId)
+                pushToScreens(force: $force, payload: $payload, teamId: $teamId) {
+                    status
+                }
             }";
 
         // ──────────────────────────────────────────────
@@ -191,7 +193,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             var data = await ExecuteAsync<PushToScreensMutationData>(PushToScreensMutation, variables)
                 .ConfigureAwait(false);
 
-            return data?.PushToScreens == true;
+            return data?.PushToScreens?.Status == true;
         }
 
         // ──────────────────────────────────────────────
