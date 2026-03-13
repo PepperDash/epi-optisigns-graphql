@@ -38,7 +38,10 @@
 				"uid": 2,
 				"properties": {
 					"control": { "method": "ipidTcp", "ipid": "A7", "tcpSshProperties": { "address": "127.0.0.2", "port": 0 } },
-					"devices": [ { "deviceKey": "optisignServer-player1", "joinStart": 401 } ]
+					"devices": [
+						{ "deviceKey": "optisignServer"        , "joinStart": 401 },
+						{ "deviceKey": "optisignServer-player1", "joinStart": 451 }
+					]
 				}
 			}
 		],
