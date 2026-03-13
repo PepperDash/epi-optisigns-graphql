@@ -37,6 +37,27 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
     {
         [JsonProperty("message")]
         public string Message { get; set; }
+
+        [JsonProperty("extensions")]
+        public GraphQlErrorExtensions Extensions { get; set; }
+
+        [JsonProperty("path")]
+        public List<string> Path { get; set; }
+    }
+
+    internal class GraphQlErrorExtensions
+    {
+        [JsonProperty("code")]
+        public string Code { get; set; }
+
+        [JsonProperty("exception")]
+        public GraphQlExceptionInfo Exception { get; set; }
+    }
+
+    internal class GraphQlExceptionInfo
+    {
+        [JsonProperty("stacktrace")]
+        public List<string> Stacktrace { get; set; }
     }
 
     // ──────────────────────────────────────────────

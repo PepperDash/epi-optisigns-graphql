@@ -293,25 +293,19 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             this.LogVerbose("responseBody: {@responseBody}", body.Trim());
         }
 
-        private void LogGraphQlError(string errorMessage, string requestBody, string responseBody)
+        private void LogGraphQlError(GraphQlError error, string requestBody, string responseBody)
         {
-            // this.LogError(">>> GraphQL Error: {errorMessage}\r\nendpoint: {endpoint}\r\napiKey: {apiKey}\r\nrequestBody: {@requestBody}\r\nresponseBody: {@responseBody}",
-            //     errorMessage, GraphQlEndpoint, MaskedApiKey, requestBody, responseBody);
-
-//             this.LogError(@"\n
-// >>> GraphQL Error: {errorMessage}\n
-// endpoint: {endpoint}\n
-// apiKey: {apiKey}\n
-// requestBody: {@requestBody}\n
-// responseBody: {@responseBody}",
-//                 errorMessage, GraphQlEndpoint, MaskedApiKey, requestBody, responseBody);
+            var errorCode = error.Extensions?.Code ?? "UNKNOWN";
+            var errorPath = error.Path != null ? string.Join(".", error.Path) : "(root)";
 
             this.LogError(">>> GraphQL Error");
-            this.LogError("errorMessage: {errorMessage}", errorMessage);
+            this.LogError("code: {code}", errorCode);
+            this.LogError("message: {message}", error.Message);
+            this.LogError("path: {path}", errorPath);
             this.LogError("endpoint: {endpoint}", GraphQlEndpoint);
             this.LogError("apiKey: {apiKey}", MaskedApiKey);
-            this.LogError("requestBody: {@requestBody}", requestBody.Trim());
-            this.LogError("responseBody: {@responseBody}", responseBody.Trim());
+            this.LogVerbose("requestBody: {@requestBody}", requestBody.Trim());
+            this.LogVerbose("responseBody: {@responseBody}", responseBody.Trim());
         }
 
         /// <summary>
@@ -361,7 +355,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 if (envelope?.Errors != null && envelope.Errors.Count > 0)
                 {
                     foreach (var error in envelope.Errors)
-                        LogGraphQlError(error.Message, requestBodyJson, responseBody);
+                        LogGraphQlError(error, requestBodyJson, responseBody);
                     // Return data anyway; partial results are valid in GraphQL
                 }
 
