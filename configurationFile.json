@@ -6,23 +6,28 @@
 		"info": {},
 		"devices": [
 			{
-				"key": "lobby-ds-player-1",
-				"name": "Lobby Digital Sign",
+				"key": "optisignServer",
+				"name": "OptiSigns Server",
 				"type": "optiSigns",
 				"group": "signage",
 				"uid": 1,
 				"properties": {
 					"apiKey": "API_KEY_123",
-					"teamId": "TEAM_ID_123",
-					"deviceId": "DEVICE_ID_123",
 					"pollIntervalMs": 30000,
-					"playlistPollIntervalMs": 300000,
-					"defaultPlaylistId": "PLAYLIST_ID_1",
-					"playlists": [
-						{ "id": "PLAYLIST_ID_1", "name": "Welcome Loop"        },
-						{ "id": "PLAYLIST_ID_2", "name": "Event Content"       },
-						{ "id": "PLAYLIST_ID_3", "name": "Emergency Messaging" }
-					]
+					"playlistPollIntervalMs": 300000,					
+					"players": [
+						{
+							"key": "player1",
+							"deviceId": "DEVICE_ID_123",
+							"teamId": "TEAM_ID_123",
+							"defaultPlaylistId": "PLAYLIST_ID_1",
+							"playlists": [
+								{ "id": "PLAYLIST_ID_1", "name": "Welcome Loop"        },
+								{ "id": "PLAYLIST_ID_2", "name": "Event Content"       },
+								{ "id": "PLAYLIST_ID_3", "name": "Emergency Messaging" }
+							]
+						}
+					]					
 				}
 			},
 			{
@@ -33,7 +38,7 @@
 				"uid": 2,
 				"properties": {
 					"control": { "method": "ipidTcp", "ipid": "A7", "tcpSshProperties": { "address": "127.0.0.2", "port": 0 } },
-					"devices": [ { "deviceKey": "lobby-ds-player-1", "joinStart": 401 } ]
+					"devices": [ { "deviceKey": "optisignServer-player1", "joinStart": 401 } ]
 				}
 			}
 		],
