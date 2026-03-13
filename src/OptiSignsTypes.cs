@@ -83,6 +83,15 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         [JsonProperty("deviceName")]
         public string DeviceName { get; set; }
 
+        [JsonProperty("UUID")]
+        public string UUID { get; set; }
+
+        [JsonProperty("pairingCode")]
+        public string PairingCode { get; set; }
+
+        [JsonProperty("localAppVersion")]
+        public string LocalAppVersion { get; set; }
+
         [JsonProperty("currentType")]
         public string CurrentType { get; set; }
 

@@ -43,6 +43,28 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         // Stored as static fields so they are allocated once, not on every poll cycle.
         // ──────────────────────────────────────────────
 
+        private static readonly string ListAllDevicesQuery =
+            @"query {
+                devices(query: {}) {
+                    page {
+                        edges {
+                            node {
+                                _id
+                                deviceName
+                                UUID
+                                pairingCode
+                                currentType
+                                currentAssetId
+                                currentPlaylistId
+                                localAppVersion
+                                status
+                                lastHeartBeat
+                            }
+                        }
+                    }
+                }
+            }";
+
         private static readonly string DeviceStatusQuery =
             @"query GetDevice($id: String!) {
                 devices(query: { _id: $id }) {
@@ -126,6 +148,27 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 return null;
 
             return data.Devices.Page.Edges[0].Node;
+        }
+
+        /// <summary>
+        /// Fetches all devices (players/screens) available in the OptiSigns account.
+        /// Returns null on any error (network, API error).
+        /// </summary>
+        public async Task<List<DeviceNode>> ListAllDevicesAsync()
+        {
+            var data = await ExecuteAsync<DevicesQueryData>(ListAllDevicesQuery, null)
+                .ConfigureAwait(false);
+
+            if (data?.Devices?.Page?.Edges == null)
+                return null;
+
+            var result = new List<DeviceNode>();
+            foreach (var edge in data.Devices.Page.Edges)
+            {
+                if (edge?.Node != null)
+                    result.Add(edge.Node);
+            }
+            return result;
         }
 
         /// <summary>

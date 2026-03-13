@@ -39,6 +39,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         private string _currentType;
         private string _currentPlaylistId;
         private string _currentPlaylistName;
+        private string _deviceName;
         private int _deviceStatus;
         private string _lastHeartBeat;
         private int _currentPlaylistIndex;   // 1-based; 0 = unknown / none
@@ -46,6 +47,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         // Resolved playlist list. Written atomically (reference swap) from the poll thread.
         private List<PlaylistNode> _playlists = new List<PlaylistNode>();
+        private int _playlistGroupOffset;
 
         // Last active playlist ID used to restore content when powered on.
         private string _lastActivePlaylistId;
@@ -72,7 +74,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         public IntFeedback PlaylistCountFeedback { get; private set; }
         public StringFeedback DeviceNameFeedback { get; private set; }
         public StringFeedback CurrentPlaylistNameFeedback { get; private set; }
-        public StringFeedback PlaylistListFeedback { get; private set; }
         public IntFeedback DeviceStatusFeedback { get; private set; }
         public StringFeedback LastHeartBeatFeedback { get; private set; }
         public StringFeedback[] PlaylistNameFeedbacks { get; private set; }
@@ -117,11 +118,10 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             PowerIsOffFeedback = new BoolFeedback(key + "-PowerIsOff", () => !_powerIsOn);
             IsPollingFeedback = new BoolFeedback(key + "-IsPolling", () => _isPolling);
             InputSelectFeedback = new IntFeedback(key + "-InputSelect", () => _currentPlaylistIndex);
-            DeviceNameFeedback = new StringFeedback(key + "-DeviceName", () => Name);
+            DeviceNameFeedback = new StringFeedback(key + "-DeviceName", 
+                () => !string.IsNullOrEmpty(_deviceName) ? _deviceName : Name);
             CurrentPlaylistNameFeedback = new StringFeedback(
                 key + "-CurrentPlaylist", () => _currentPlaylistName ?? string.Empty);
-            PlaylistListFeedback = new StringFeedback(
-                key + "-PlaylistList", BuildPlaylistListString);
             DeviceStatusFeedback = new IntFeedback(
                 key + "-DeviceStatus", () => _deviceStatus);
             LastHeartBeatFeedback = new StringFeedback(
@@ -129,7 +129,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
             PlaylistCountFeedback = new IntFeedback(
                 key + "-PlaylistCount",
-                () => Math.Min(_playlists.Count, MaxPlaylistBridgeCount));
+                () => _playlists.Count);
 
             // One feedback per bridged slot (0-based index, 0 = playlist 1 on the SIMPL side).
             PlaylistNameFeedbacks = new StringFeedback[MaxPlaylistBridgeCount];
@@ -138,9 +138,13 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 var capturedI = i;
                 PlaylistNameFeedbacks[i] = new StringFeedback(
                     string.Format("{0}-PlaylistName-{1}", key, capturedI + 1),
-                    () => capturedI < _playlists.Count
-                        ? (_playlists[capturedI].Name ?? string.Empty)
-                        : string.Empty);
+                    () =>
+                    {
+                        var actualIndex = _playlistGroupOffset + capturedI;
+                        return actualIndex < _playlists.Count
+                            ? (_playlists[actualIndex].Name ?? string.Empty)
+                            : string.Empty;
+                    });
             }
         }
 
@@ -286,6 +290,14 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     _lastHeartBeat = node.LastHeartBeat;
                     LastHeartBeatFeedback.FireUpdate();
                 }
+
+                // Update device name from API response
+                if (!string.IsNullOrEmpty(node.DeviceName) && node.DeviceName != _deviceName)
+                {
+                    this.LogVerbose("[OptiSigns] Device name updated: {0}", node.DeviceName);
+                    _deviceName = node.DeviceName;
+                    DeviceNameFeedback.FireUpdate();
+                }
             }
             catch (Exception ex)
             {
@@ -315,7 +327,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     this.LogDebug(
                         "Playlist API returned null — using config-provided list ({0} items)",
                         _playlists.Count);
-                    PlaylistListFeedback.FireUpdate();
                     FirePlaylistNameFeedbacks();
                     return;
                 }
@@ -323,7 +334,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 if (apiPlaylists.Count == 0)
                 {
                     this.LogWarning("Playlist API returned an empty list");
-                    PlaylistListFeedback.FireUpdate();
                     FirePlaylistNameFeedbacks();
                     return;
                 }
@@ -351,7 +361,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     CurrentPlaylistNameFeedback.FireUpdate();
                 }
 
-                PlaylistListFeedback.FireUpdate();
                 FirePlaylistNameFeedbacks();
             }
             catch (Exception ex)
@@ -618,20 +627,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             return 0;
         }
 
-        private string BuildPlaylistListString()
-        {
-            if (_playlists == null || _playlists.Count == 0)
-                return string.Empty;
-
-            var sb = new StringBuilder();
-            for (var i = 0; i < _playlists.Count; i++)
-            {
-                if (i > 0) sb.Append('|');
-                sb.Append(_playlists[i].Name ?? string.Empty);
-            }
-            return sb.ToString();
-        }
-
         private static int MapDeviceStatus(string status)
         {
             if (string.IsNullOrEmpty(status)) return 0;
@@ -659,6 +654,54 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 fb.FireUpdate();
         }
 
+        /// <summary>
+        /// Navigates to the first page of playlists (offset = 0).
+        /// </summary>
+        public void FirstPlaylistPage()
+        {
+            if (_playlistGroupOffset == 0)
+            {
+                this.LogDebug("FirstPlaylistPage: already at beginning");
+                return;
+            }
+
+            _playlistGroupOffset = 0;
+            this.LogDebug("FirstPlaylistPage: offset now 0");
+            FirePlaylistNameFeedbacks();
+        }
+
+        /// <summary>
+        /// Advances to the next page of playlists (offset += MaxPlaylistBridgeCount).
+        /// </summary>
+        public void NextPlaylistPage()
+        {
+            if (_playlistGroupOffset + MaxPlaylistBridgeCount >= _playlists.Count)
+            {
+                this.LogDebug("NextPlaylistPage: already at end");
+                return;
+            }
+
+            _playlistGroupOffset += MaxPlaylistBridgeCount;
+            this.LogDebug("NextPlaylistPage: offset now {0}", _playlistGroupOffset);
+            FirePlaylistNameFeedbacks();
+        }
+
+        /// <summary>
+        /// Goes back to the previous page of playlists (offset -= MaxPlaylistBridgeCount).
+        /// </summary>
+        public void PreviousPlaylistPage()
+        {
+            if (_playlistGroupOffset <= 0)
+            {
+                this.LogDebug("PreviousPlaylistPage: already at beginning");
+                return;
+            }
+
+            _playlistGroupOffset = Math.Max(0, _playlistGroupOffset - MaxPlaylistBridgeCount);
+            this.LogDebug("PreviousPlaylistPage: offset now {0}", _playlistGroupOffset);
+            FirePlaylistNameFeedbacks();
+        }
+
         private void FireAllFeedbacks()
         {
             IsOnlineFeedback.FireUpdate();
@@ -668,7 +711,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             InputSelectFeedback.FireUpdate();
             DeviceNameFeedback.FireUpdate();
             CurrentPlaylistNameFeedback.FireUpdate();
-            PlaylistListFeedback.FireUpdate();
             DeviceStatusFeedback.FireUpdate();
             LastHeartBeatFeedback.FireUpdate();
             FirePlaylistNameFeedbacks();
@@ -704,6 +746,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             trilist.SetSigTrueAction(joinMap.PowerToggle.JoinNumber, PowerToggle);
             trilist.SetSigTrueAction(joinMap.PollNow.JoinNumber,
                 () => CrestronInvoke.BeginInvoke(_ => PollDeviceStatusAsync()));
+            trilist.SetSigTrueAction(joinMap.PageFirst.JoinNumber, FirstPlaylistPage);
+            trilist.SetSigTrueAction(joinMap.PageNext.JoinNumber, NextPlaylistPage);
+            trilist.SetSigTrueAction(joinMap.PreviousPage.JoinNumber, PreviousPlaylistPage);
 
             // ── Analog: ToFromSIMPL ───────────────────────────────────
             InputSelectFeedback.LinkInputSig(trilist.UShortInput[joinMap.SelectPlaylistByIndex.JoinNumber]);
@@ -715,8 +760,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             trilist.SetString(joinMap.DeviceName.JoinNumber, Name);
             CurrentPlaylistNameFeedback.LinkInputSig(
                 trilist.StringInput[joinMap.CurrentPlaylistName.JoinNumber]);
-            PlaylistListFeedback.LinkInputSig(
-                trilist.StringInput[joinMap.PlaylistList.JoinNumber]);
+
             DeviceStatusFeedback.LinkInputSig(
                 trilist.UShortInput[joinMap.DeviceStatus.JoinNumber]);
             LastHeartBeatFeedback.LinkInputSig(

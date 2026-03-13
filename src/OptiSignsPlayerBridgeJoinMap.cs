@@ -24,7 +24,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
     /// Serial  2   LastHeartBeat       ToSIMPL      ISO 8601 timestamp of last device heartbeat
     /// Serial  6   SelectPlaylistById  FromSIMPL    Send a playlist _id string to select directly
     /// Serial  6   CurrentPlaylistName ToSIMPL      Name of the currently active playlist
-    /// Serial  10  PlaylistList        ToSIMPL      Pipe-delimited list: "Name1|Name2|Name3"
     /// Serial  11  PlaylistName[1]     ToSIMPL      Name of playlist 1 (empty if slot unused)
     ///   ...
     /// Serial  40  PlaylistName[30]    ToSIMPL      Name of playlist 30 (empty if slot unused)
@@ -115,6 +114,37 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 JoinType = eJoinType.Digital
             });
 
+        [JoinName("PageFirst")]
+        public JoinDataComplete PageFirst = new JoinDataComplete(
+            new JoinData { JoinNumber = 6, JoinSpan = 1 },
+            new JoinMetadata
+            {
+                Description = "Pulse from SIMPL to navigate to the first page of playlists.",
+                JoinCapabilities = eJoinCapabilities.FromSIMPL,
+                JoinType = eJoinType.Digital
+            });
+            
+        [JoinName("PageNext")]
+        public JoinDataComplete PageNext = new JoinDataComplete(
+            new JoinData { JoinNumber = 7, JoinSpan = 1 },
+            new JoinMetadata
+            {
+                Description = "Pulse from SIMPL to advance to the next page of playlists.",
+                JoinCapabilities = eJoinCapabilities.FromSIMPL,
+                JoinType = eJoinType.Digital
+            });
+
+        [JoinName("PreviousPage")]
+        public JoinDataComplete PreviousPage = new JoinDataComplete(
+            new JoinData { JoinNumber = 8, JoinSpan = 1 },
+            new JoinMetadata
+            {
+                Description = "Pulse from SIMPL to go back to the previous page of playlists.",
+                JoinCapabilities = eJoinCapabilities.FromSIMPL,
+                JoinType = eJoinType.Digital
+            });
+
+
         #endregion
 
         #region Analog
@@ -197,18 +227,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             new JoinMetadata
             {
                 Description = "Name of the currently active playlist. Empty string when powered off.",
-                JoinCapabilities = eJoinCapabilities.ToSIMPL,
-                JoinType = eJoinType.Serial
-            });
-
-        [JoinName("PlaylistList")]
-        public JoinDataComplete PlaylistList = new JoinDataComplete(
-            new JoinData { JoinNumber = 10, JoinSpan = 1 },
-            new JoinMetadata
-            {
-                Description = "Pipe-delimited (|) list of playlist names in index order. " +
-                              "Suitable for populating a SIMPL+ string array or button list. " +
-                              "Index 1 corresponds to the first name in the list.",
                 JoinCapabilities = eJoinCapabilities.ToSIMPL,
                 JoinType = eJoinType.Serial
             });
