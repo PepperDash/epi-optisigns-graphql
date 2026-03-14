@@ -234,10 +234,11 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 _consecutiveFailures = 0;
 
                 this.LogVerbose(
-                    "[OptiSigns] Status poll result: CurrentType={0}, Status={1}, CurrentPlaylistId={2}, LastHeartBeat={3}, DeviceName={4}",
+                    "[OptiSigns] Status poll result: CurrentType={0}, Status={1}, CurrentPlaylistId={2}, CurrentAssetId={3}, LastHeartBeat={4}, DeviceName={5}",
                     node.CurrentType ?? "(null)",
                     node.Status ?? "(null)",
                     node.CurrentPlaylistId ?? "(null)",
+                    node.CurrentAssetId ?? "(null)",
                     node.LastHeartBeat ?? "(null)",
                     node.DeviceName ?? "(null)");
 
@@ -263,19 +264,32 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     PowerIsOffFeedback.FireUpdate();
                 }
 
-                // Track last known playlist for power-on restore
-                if (_powerIsOn && !string.IsNullOrEmpty(node.CurrentPlaylistId))
-                    _lastActivePlaylistId = node.CurrentPlaylistId;
+                // Per API docs: currentAssetId is used for PLAYLIST/ASSET content (set via updateDevice).
+                // currentPlaylistId may be a legacy field. Use currentAssetId when currentType is PLAYLIST.
+                var isPlaylistType = string.Equals(node.CurrentType, "PLAYLIST", StringComparison.OrdinalIgnoreCase);
+                var effectivePlaylistId = isPlaylistType
+                    ? node.CurrentAssetId
+                    : node.CurrentPlaylistId;
 
-                if (node.CurrentPlaylistId != _currentPlaylistId)
+                this.LogVerbose(
+                    "[OptiSigns] Effective playlist calculation: isPlaylistType={0}, using {1}, effectiveId={2}",
+                    isPlaylistType,
+                    isPlaylistType ? "CurrentAssetId" : "CurrentPlaylistId",
+                    effectivePlaylistId ?? "(null)");
+
+                // Track last known playlist for power-on restore
+                if (_powerIsOn && !string.IsNullOrEmpty(effectivePlaylistId))
+                    _lastActivePlaylistId = effectivePlaylistId;
+
+                if (effectivePlaylistId != _currentPlaylistId)
                 {
                     this.LogVerbose(
                         "[OptiSigns] Playlist changed: Id={0} -> {1}, Name={2}, Index={3}",
                         _currentPlaylistId ?? "(null)",
-                        node.CurrentPlaylistId ?? "(null)",
-                        ResolvePlaylistName(node.CurrentPlaylistId),
-                        ResolvePlaylistIndex(node.CurrentPlaylistId));
-                    _currentPlaylistId = node.CurrentPlaylistId;
+                        effectivePlaylistId ?? "(null)",
+                        ResolvePlaylistName(effectivePlaylistId),
+                        ResolvePlaylistIndex(effectivePlaylistId));
+                    _currentPlaylistId = effectivePlaylistId;
                     _currentPlaylistName = ResolvePlaylistName(_currentPlaylistId);
                     _currentPlaylistIndex = ResolvePlaylistIndex(_currentPlaylistId);
                     CurrentPlaylistNameFeedback.FireUpdate();
@@ -387,21 +401,24 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// </summary>
         public void PowerOn()
         {
-            var playlistId = _lastActivePlaylistId
-                ?? _playerConfig.DefaultPlaylistId
-                ?? (_playlists.Count > 0 ? _playlists[0].Id : null);
+            // var playlistId = _lastActivePlaylistId
+            //     ?? _playerConfig.DefaultPlaylistId
+            //     ?? (_playlists.Count > 0 ? _playlists[0].Id : null);
 
-            if (string.IsNullOrEmpty(playlistId))
-            {
-                this.LogWarning("PowerOn: no playlist ID available. " +
-                    "Configure 'defaultPlaylistId' or ensure playlists are loaded.");
-                return;
-            }
+            // if (string.IsNullOrEmpty(playlistId))
+            // {
+            //     this.LogWarning("PowerOn: no playlist ID available. " +
+            //         "Configure 'defaultPlaylistId' or ensure playlists are loaded.");
+            //     return;
+            // }
 
-            this.LogInformation("PowerOn: pushing playlist {0}", playlistId);
+            // this.LogInformation("PowerOn: pushing playlist {0}", playlistId);
 
-            ApplyOptimisticPlaylistState(playlistId, powerOn: true);
-            CrestronInvoke.BeginInvoke(_ => PowerOnAsync(playlistId));
+            // ApplyOptimisticPlaylistState(playlistId, powerOn: true);
+            // CrestronInvoke.BeginInvoke(_ => PowerOnAsync(playlistId));
+
+            throw new NotImplementedException("PowerOn is not implemented in this version. " +
+                "Please set 'usePushToScreens' to false in the configuration to use updateDevice for power control.");
         }
 
         private async void PowerOnAsync(string playlistId)
@@ -448,20 +465,23 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// </summary>
         public void PowerOff()
         {
-            this.LogInformation("PowerOff: setting currentType=NONE for device {0}", _playerConfig.DeviceId);
+            // this.LogInformation("PowerOff: setting currentType=NONE for device {0}", _playerConfig.DeviceId);
 
-            if (!string.IsNullOrEmpty(_currentPlaylistId))
-                _lastActivePlaylistId = _currentPlaylistId;
+            // if (!string.IsNullOrEmpty(_currentPlaylistId))
+            //     _lastActivePlaylistId = _currentPlaylistId;
 
-            _powerIsOn = false;
-            _currentPlaylistName = string.Empty;
-            _currentPlaylistIndex = 0;
-            PowerIsOnFeedback.FireUpdate();
-            PowerIsOffFeedback.FireUpdate();
-            CurrentPlaylistNameFeedback.FireUpdate();
-            InputSelectFeedback.FireUpdate();
+            // _powerIsOn = false;
+            // _currentPlaylistName = string.Empty;
+            // _currentPlaylistIndex = 0;
+            // PowerIsOnFeedback.FireUpdate();
+            // PowerIsOffFeedback.FireUpdate();
+            // CurrentPlaylistNameFeedback.FireUpdate();
+            // InputSelectFeedback.FireUpdate();
 
-            CrestronInvoke.BeginInvoke(_ => PowerOffAsync());
+            // CrestronInvoke.BeginInvoke(_ => PowerOffAsync());
+
+            throw new NotImplementedException("PowerOff is not implemented in this version. " +
+                "Please set 'usePushToScreens' to false in the configuration to use updateDevice for power control.");
         }
 
         private async void PowerOffAsync()
@@ -501,8 +521,11 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// <summary>Toggles power state based on current PowerIsOn feedback.</summary>
         public void PowerToggle()
         {
-            if (_powerIsOn) PowerOff();
-            else PowerOn();
+            // if (_powerIsOn) PowerOff();
+            // else PowerOn();
+
+            throw new NotImplementedException("PowerToggle is not implemented in this version. " +
+                "Please set 'usePushToScreens' to false in the configuration to use updateDevice for power control.");
         }
 
         /// <summary>
@@ -642,12 +665,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         private void ApplyOptimisticPlaylistState(string playlistId, bool powerOn)
         {
-            if (powerOn != _powerIsOn)
-            {
-                _powerIsOn = powerOn;
-                PowerIsOnFeedback.FireUpdate();
-                PowerIsOffFeedback.FireUpdate();
-            }
+            // if (powerOn != _powerIsOn)
+            // {
+            //     _powerIsOn = powerOn;
+            //     PowerIsOnFeedback.FireUpdate();
+            //     PowerIsOffFeedback.FireUpdate();
+            // }
 
             _currentPlaylistId = playlistId;
             _currentPlaylistName = ResolvePlaylistName(playlistId);
