@@ -93,6 +93,20 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 JoinType = eJoinType.Digital
             });
 
+        [JoinName("PlaylistItemAsJsonObject")]
+        public JoinDataComplete PlaylistItemAsJsonObject = new JoinDataComplete(
+            new JoinData { JoinNumber = 6, JoinSpan = 1 },
+            new JoinMetadata
+            {
+                Description = "Controls playlist item format on S11-S40. " +
+                              "High = JSON format: {\"id\":\"...\",\"name\":\"...\"}. " +
+                              "Low = Pipe-delimited: {ListIndex}|{id}|{name}. " +
+                              "Default is JSON (high).",
+                JoinCapabilities = eJoinCapabilities.FromSIMPL,
+                JoinType = eJoinType.Digital
+            });
+
+
 
         #endregion
 
@@ -197,10 +211,10 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             new JoinData { JoinNumber = 11, JoinSpan = 30 },
             new JoinMetadata
             {
-                Description = "Names of available playlists. " +
+                Description = "Playlist data. Format controlled by D6 (PlaylistItemAsJsonObject): " +
+                              "JSON: {\"id\":\"...\",\"name\":\"...\"} or Pipe: {ListIndex}|{id}|{name}. " +
                               "S11 = playlist 1, S12 = playlist 2, ..., S40 = playlist 30. " +
-                              "Slots beyond the current PlaylistCount are sent as empty strings. " +
-                              "Use PlaylistCount (A5) to know how many slots are populated.",
+                              "Slots beyond the current PlaylistCount are sent as empty strings.",
                 JoinCapabilities = eJoinCapabilities.ToSIMPL,
                 JoinType = eJoinType.Serial
             });

@@ -59,6 +59,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         // Maximum number of playlist name serial joins bridged to SIMPL (S11-S40).
         public const int MaxPlaylistBridgeCount = 30;
 
+        // When true, playlist items are sent as JSON; when false, as pipe-delimited string
+        private bool _playlistItemAsJsonFormat = true;
+
         private CTimer _statusPollTimer;
         private CTimer _playlistPollTimer;
 
@@ -146,9 +149,16 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     () =>
                     {
                         var actualIndex = _playlistGroupOffset + capturedI;
-                        return actualIndex < _playlists.Count
-                            ? (_playlists[actualIndex].Name ?? string.Empty)
-                            : string.Empty;
+                        if (actualIndex >= _playlists.Count)
+                            return string.Empty;
+
+                        var playlist = _playlists[actualIndex];
+                        var listIndex = actualIndex + 1; // 1-based index
+
+                        if (_playlistItemAsJsonFormat)
+                            return JsonConvert.SerializeObject(new { id = playlist.Id, name = playlist.Name });
+                        else
+                            return string.Format("{0}|{1}|{2}", listIndex, playlist.Id, playlist.Name);
                     });
             }
         }
@@ -609,6 +619,20 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             IsPollingFeedback.FireUpdate();
         }
 
+        /// <summary>
+        /// Sets the format for playlist items sent to the bridge.
+        /// When true, items are sent as JSON: {"id":"...","name":"..."}.
+        /// When false, items are sent as pipe-delimited: {ListIndex}|{id}|{name}.
+        /// </summary>
+        public void SetPlaylistItemJsonFormat(bool useJson)
+        {
+            if (_playlistItemAsJsonFormat == useJson) return;
+
+            _playlistItemAsJsonFormat = useJson;
+            this.LogDebug("PlaylistItemJsonFormat set to: {0}", useJson);
+            FirePlaylistNameFeedbacks();
+        }
+
         private void FirePlaylistNameFeedbacks()
         {
             PlaylistCountFeedback.FireUpdate();
@@ -710,6 +734,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             trilist.SetSigTrueAction(joinMap.PageFirst.JoinNumber, FirstPlaylistPage);
             trilist.SetSigTrueAction(joinMap.PageNext.JoinNumber, NextPlaylistPage);
             trilist.SetSigTrueAction(joinMap.PreviousPage.JoinNumber, PreviousPlaylistPage);
+            trilist.SetBoolSigAction(joinMap.PlaylistItemAsJsonObject.JoinNumber, SetPlaylistItemJsonFormat);
 
             // ── Analog: ToFromSIMPL ───────────────────────────────────
             AbsoluteInputSelectFeedback.LinkInputSig(trilist.UShortInput[joinMap.SelectPlaylistByAbsoluteIndex.JoinNumber]);
