@@ -70,7 +70,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         public BoolFeedback PowerIsOnFeedback { get; private set; }
         public BoolFeedback PowerIsOffFeedback { get; private set; }
         public BoolFeedback IsPollingFeedback { get; private set; }
-        public IntFeedback InputSelectFeedback { get; private set; }
+        public IntFeedback AbsoluteInputSelectFeedback { get; private set; }
+        public IntFeedback RelativeInputSelectFeedback { get; private set; }
         public IntFeedback PlaylistCountFeedback { get; private set; }
         public StringFeedback DeviceNameFeedback { get; private set; }
         public StringFeedback CurrentPlaylistNameFeedback { get; private set; }
@@ -116,7 +117,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             PowerIsOnFeedback = new BoolFeedback(key + "-PowerIsOn", () => _powerIsOn);
             PowerIsOffFeedback = new BoolFeedback(key + "-PowerIsOff", () => !_powerIsOn);
             IsPollingFeedback = new BoolFeedback(key + "-IsPolling", () => _isPolling);
-            InputSelectFeedback = new IntFeedback(key + "-InputSelect", () => GetPageRelativePlaylistIndex());
+            AbsoluteInputSelectFeedback = new IntFeedback(key + "-AbsoluteInputSelect", () => _currentPlaylistIndex);
+            RelativeInputSelectFeedback = new IntFeedback(key + "-RelativeInputSelect", () => GetPageRelativePlaylistIndex());
             DeviceNameFeedback = new StringFeedback(key + "-DeviceName", 
                 () => !string.IsNullOrEmpty(_deviceName) 
                     ? _deviceName 
@@ -289,7 +291,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     _currentPlaylistName = ResolvePlaylistName(_currentPlaylistId);
                     _currentPlaylistIndex = ResolvePlaylistIndex(_currentPlaylistId);
                     CurrentPlaylistNameFeedback.FireUpdate();
-                    InputSelectFeedback.FireUpdate();
+                    AbsoluteInputSelectFeedback.FireUpdate();
+                    RelativeInputSelectFeedback.FireUpdate();
                 }
 
                 var mappedStatus = MapDeviceStatus(node.Status);
@@ -368,7 +371,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 if (newIndex != _currentPlaylistIndex)
                 {
                     _currentPlaylistIndex = newIndex;
-                    InputSelectFeedback.FireUpdate();
+                    AbsoluteInputSelectFeedback.FireUpdate();
+                    RelativeInputSelectFeedback.FireUpdate();
                 }
 
                 var newName = ResolvePlaylistName(_currentPlaylistId);
@@ -404,21 +408,47 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         // ──────────────────────────────────────────────
 
         /// <summary>
-        /// Selects a playlist by its 1-based index relative to the current page.
-        /// This is the handler for the InputSelect analog join from SIMPL.
-        /// When on page 2 (offset 30), entering index 5 selects playlist 35.
+        /// Selects a playlist by its absolute 1-based index in the entire playlist list.
+        /// Index 1 = first playlist, index 2 = second playlist, etc.
+        /// Ignores pagination - always selects from the full list.
         /// </summary>
-        public void SelectPlaylistByIndex(ushort index)
+        public void SelectPlaylistByAbsoluteIndex(ushort index)
         {
             if (_playlists == null || _playlists.Count == 0)
             {
-                this.LogWarning("SelectPlaylistByIndex({0}): no playlists loaded", index);
+                this.LogWarning("SelectPlaylistByAbsoluteIndex({0}): no playlists loaded", index);
+                return;
+            }
+
+            if (index < 1 || index > _playlists.Count)
+            {
+                this.LogWarning("SelectPlaylistByAbsoluteIndex({0}): out of range (1-{1})",
+                    index, _playlists.Count);
+                return;
+            }
+
+            var playlist = _playlists[index - 1];
+            this.LogDebug("SelectPlaylistByAbsoluteIndex({0}): '{1}' (id={2})",
+                index, playlist.Name, playlist.Id);
+
+            SelectPlaylistById(playlist.Id);
+        }
+
+        /// <summary>
+        /// Selects a playlist by its 1-based index relative to the current page.
+        /// When on page 2 (offset 30), entering index 5 selects playlist 35.
+        /// </summary>
+        public void SelectPlaylistByRelativeIndex(ushort index)
+        {
+            if (_playlists == null || _playlists.Count == 0)
+            {
+                this.LogWarning("SelectPlaylistByRelativeIndex({0}): no playlists loaded", index);
                 return;
             }
 
             if (index < 1 || index > MaxPlaylistBridgeCount)
             {
-                this.LogWarning("SelectPlaylistByIndex({0}): out of range (1-{1})",
+                this.LogWarning("SelectPlaylistByRelativeIndex({0}): out of range (1-{1})",
                     index, MaxPlaylistBridgeCount);
                 return;
             }
@@ -428,13 +458,13 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
             if (actualIndex >= _playlists.Count)
             {
-                this.LogWarning("SelectPlaylistByIndex({0}): actual index {1} exceeds playlist count {2}",
+                this.LogWarning("SelectPlaylistByRelativeIndex({0}): actual index {1} exceeds playlist count {2}",
                     index, actualIndex + 1, _playlists.Count);
                 return;
             }
 
             var playlist = _playlists[actualIndex];
-            this.LogDebug("SelectPlaylistByIndex({0}): page offset={1}, actual index={2}, '{3}' (id={4})",
+            this.LogDebug("SelectPlaylistByRelativeIndex({0}): page offset={1}, actual index={2}, '{3}' (id={4})",
                 index, _playlistGroupOffset, actualIndex + 1, playlist.Name, playlist.Id);
 
             SelectPlaylistById(playlist.Id);
@@ -514,7 +544,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             _currentPlaylistName = ResolvePlaylistName(playlistId);
             _currentPlaylistIndex = ResolvePlaylistIndex(playlistId);
             CurrentPlaylistNameFeedback.FireUpdate();
-            InputSelectFeedback.FireUpdate();
+            AbsoluteInputSelectFeedback.FireUpdate();
+            RelativeInputSelectFeedback.FireUpdate();
         }
 
         private void ScheduleConfirmationPoll()
@@ -599,7 +630,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             _playlistGroupOffset = 0;
             this.LogDebug("FirstPlaylistPage: offset now 0");
             FirePlaylistNameFeedbacks();
-            InputSelectFeedback.FireUpdate();
+            RelativeInputSelectFeedback.FireUpdate();
         }
 
         /// <summary>
@@ -616,7 +647,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             _playlistGroupOffset += MaxPlaylistBridgeCount;
             this.LogDebug("NextPlaylistPage: offset now {0}", _playlistGroupOffset);
             FirePlaylistNameFeedbacks();
-            InputSelectFeedback.FireUpdate();
+            RelativeInputSelectFeedback.FireUpdate();
         }
 
         /// <summary>
@@ -633,7 +664,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             _playlistGroupOffset = Math.Max(0, _playlistGroupOffset - MaxPlaylistBridgeCount);
             this.LogDebug("PreviousPlaylistPage: offset now {0}", _playlistGroupOffset);
             FirePlaylistNameFeedbacks();
-            InputSelectFeedback.FireUpdate();
+            RelativeInputSelectFeedback.FireUpdate();
         }
 
         private void FireAllFeedbacks()
@@ -642,7 +673,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             PowerIsOnFeedback.FireUpdate();
             PowerIsOffFeedback.FireUpdate();
             IsPollingFeedback.FireUpdate();
-            InputSelectFeedback.FireUpdate();
+            AbsoluteInputSelectFeedback.FireUpdate();
+            RelativeInputSelectFeedback.FireUpdate();
             DeviceNameFeedback.FireUpdate();
             CurrentPlaylistNameFeedback.FireUpdate();
             DeviceStatusFeedback.FireUpdate();
@@ -680,8 +712,11 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             trilist.SetSigTrueAction(joinMap.PreviousPage.JoinNumber, PreviousPlaylistPage);
 
             // ── Analog: ToFromSIMPL ───────────────────────────────────
-            InputSelectFeedback.LinkInputSig(trilist.UShortInput[joinMap.SelectPlaylistByIndex.JoinNumber]);
-            trilist.SetUShortSigAction(joinMap.SelectPlaylistByIndex.JoinNumber, SelectPlaylistByIndex);
+            AbsoluteInputSelectFeedback.LinkInputSig(trilist.UShortInput[joinMap.SelectPlaylistByAbsoluteIndex.JoinNumber]);
+            trilist.SetUShortSigAction(joinMap.SelectPlaylistByAbsoluteIndex.JoinNumber, SelectPlaylistByAbsoluteIndex);
+
+            RelativeInputSelectFeedback.LinkInputSig(trilist.UShortInput[joinMap.SelectPlaylistByRelativeIndex.JoinNumber]);
+            trilist.SetUShortSigAction(joinMap.SelectPlaylistByRelativeIndex.JoinNumber, SelectPlaylistByRelativeIndex);
 
             PlaylistCountFeedback.LinkInputSig(trilist.UShortInput[joinMap.PlaylistCount.JoinNumber]);
 

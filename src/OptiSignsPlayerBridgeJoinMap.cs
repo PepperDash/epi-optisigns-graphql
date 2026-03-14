@@ -120,9 +120,21 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 JoinType = eJoinType.Analog
             });
 
-        [JoinName("SelectPlaylistByIndex")]
-        public JoinDataComplete SelectPlaylistByIndex = new JoinDataComplete(
+        [JoinName("SelectPlaylistByAbsoluteIndex")]
+        public JoinDataComplete SelectPlaylistByAbsoluteIndex = new JoinDataComplete(
             new JoinData { JoinNumber = 6, JoinSpan = 1 },
+            new JoinMetadata
+            {
+                Description = "Absolute 1-based index across all playlists. Send from SIMPL to select " +
+                              "a playlist by its position in the entire list (ignoring pagination). " +
+                              "Feedback shows the current playlist's absolute index, or 0 if unknown.",
+                JoinCapabilities = eJoinCapabilities.ToFromSIMPL,
+                JoinType = eJoinType.Analog
+            });
+
+        [JoinName("SelectPlaylistByRelativeIndex")]
+        public JoinDataComplete SelectPlaylistByRelativeIndex = new JoinDataComplete(
+            new JoinData { JoinNumber = 7, JoinSpan = 1 },
             new JoinMetadata
             {
                 Description = "Page-relative 1-based index. Send from SIMPL to select a playlist " +
