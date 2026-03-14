@@ -33,14 +33,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         public int PlaylistPollIntervalMs { get; set; }
 
         /// <summary>
-        /// When true, uses the pushToScreens mutation for playlist selection.
-        /// When false (default), uses updateDevice mutation with currentType=PLAYLIST
-        /// and currentAssetId as documented in the OptiSigns API.
-        /// </summary>
-        [JsonProperty("usePushToScreens")]
-        public bool UsePushToScreens { get; set; }
-
-        /// <summary>
         /// List of OptiSigns players (screens) managed by this server.
         /// Each player has its own deviceId, teamId, and playlist configuration.
         /// </summary>

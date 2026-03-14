@@ -163,8 +163,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     playerConfig,
                     _client,
                     _props.PollIntervalMs,
-                    _props.PlaylistPollIntervalMs,
-                    _props.UsePushToScreens);
+                    _props.PlaylistPollIntervalMs);
 
                 _players.Add(player);
 

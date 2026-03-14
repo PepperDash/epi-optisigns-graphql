@@ -42,61 +42,10 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 JoinCapabilities = eJoinCapabilities.ToSIMPL,
                 JoinType = eJoinType.Digital
             });
-
-        [JoinName("PowerOn")]
-        public JoinDataComplete PowerOn = new JoinDataComplete(
-            new JoinData { JoinNumber = 2, JoinSpan = 1 },
-            new JoinMetadata
-            {
-                Description = "Pulse from SIMPL to power on: pushes last active or default playlist " +
-                              "to the screen via pushToScreens (type: NOW).",
-                JoinCapabilities = eJoinCapabilities.FromSIMPL,
-                JoinType = eJoinType.Digital
-            });
-
-        [JoinName("PowerIsOn")]
-        public JoinDataComplete PowerIsOn = new JoinDataComplete(
-            new JoinData { JoinNumber = 2, JoinSpan = 1 },
-            new JoinMetadata
-            {
-                Description = "High when the screen's currentType is not NONE (content is playing).",
-                JoinCapabilities = eJoinCapabilities.ToSIMPL,
-                JoinType = eJoinType.Digital
-            });
-
-        [JoinName("PowerOff")]
-        public JoinDataComplete PowerOff = new JoinDataComplete(
-            new JoinData { JoinNumber = 3, JoinSpan = 1 },
-            new JoinMetadata
-            {
-                Description = "Pulse from SIMPL to power off: sets currentType to NONE via updateDevice.",
-                JoinCapabilities = eJoinCapabilities.FromSIMPL,
-                JoinType = eJoinType.Digital
-            });
-
-        [JoinName("PowerIsOff")]
-        public JoinDataComplete PowerIsOff = new JoinDataComplete(
-            new JoinData { JoinNumber = 3, JoinSpan = 1 },
-            new JoinMetadata
-            {
-                Description = "High when the screen's currentType is NONE (idle/blank).",
-                JoinCapabilities = eJoinCapabilities.ToSIMPL,
-                JoinType = eJoinType.Digital
-            });
-
-        [JoinName("PowerToggle")]
-        public JoinDataComplete PowerToggle = new JoinDataComplete(
-            new JoinData { JoinNumber = 4, JoinSpan = 1 },
-            new JoinMetadata
-            {
-                Description = "Pulse from SIMPL to toggle power state.",
-                JoinCapabilities = eJoinCapabilities.FromSIMPL,
-                JoinType = eJoinType.Digital
-            });
-
+        
         [JoinName("PollNow")]
         public JoinDataComplete PollNow = new JoinDataComplete(
-            new JoinData { JoinNumber = 5, JoinSpan = 1 },
+            new JoinData { JoinNumber = 2, JoinSpan = 1 },
             new JoinMetadata
             {
                 Description = "Pulse from SIMPL to trigger an immediate device status and playlist poll.",
@@ -106,7 +55,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         [JoinName("IsPolling")]
         public JoinDataComplete IsPolling = new JoinDataComplete(
-            new JoinData { JoinNumber = 5, JoinSpan = 1 },
+            new JoinData { JoinNumber = 2, JoinSpan = 1 },
             new JoinMetadata
             {
                 Description = "High while an async API call is currently in progress.",
@@ -116,7 +65,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         [JoinName("PageFirst")]
         public JoinDataComplete PageFirst = new JoinDataComplete(
-            new JoinData { JoinNumber = 6, JoinSpan = 1 },
+            new JoinData { JoinNumber = 3, JoinSpan = 1 },
             new JoinMetadata
             {
                 Description = "Pulse from SIMPL to navigate to the first page of playlists.",
@@ -126,7 +75,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             
         [JoinName("PageNext")]
         public JoinDataComplete PageNext = new JoinDataComplete(
-            new JoinData { JoinNumber = 7, JoinSpan = 1 },
+            new JoinData { JoinNumber = 4, JoinSpan = 1 },
             new JoinMetadata
             {
                 Description = "Pulse from SIMPL to advance to the next page of playlists.",
@@ -136,7 +85,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         [JoinName("PreviousPage")]
         public JoinDataComplete PreviousPage = new JoinDataComplete(
-            new JoinData { JoinNumber = 8, JoinSpan = 1 },
+            new JoinData { JoinNumber = 5, JoinSpan = 1 },
             new JoinMetadata
             {
                 Description = "Pulse from SIMPL to go back to the previous page of playlists.",

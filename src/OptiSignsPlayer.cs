@@ -29,7 +29,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         private readonly OptiSignsGraphQLClient _client;
         private readonly int _pollIntervalMs;
         private readonly int _playlistPollIntervalMs;
-        private readonly bool _usePushToScreens;
 
         // ──────────────────────────────────────────────
         // Internal state
@@ -92,22 +91,19 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// <param name="client">Shared GraphQL client from the parent server</param>
         /// <param name="pollIntervalMs">Status poll interval in milliseconds</param>
         /// <param name="playlistPollIntervalMs">Playlist poll interval in milliseconds</param>
-        /// <param name="usePushToScreens">When true, uses pushToScreens mutation; otherwise uses updateDevice</param>
         public OptiSignsPlayer(
             string key,
             string name,
             OptiSignsPlayerConfig playerConfig,
             OptiSignsGraphQLClient client,
             int pollIntervalMs,
-            int playlistPollIntervalMs,
-            bool usePushToScreens = false)
+            int playlistPollIntervalMs)
             : base(key, name)
         {
             _playerConfig = playerConfig;
             _client = client;
             _pollIntervalMs = pollIntervalMs;
             _playlistPollIntervalMs = playlistPollIntervalMs;
-            _usePushToScreens = usePushToScreens;
             // Seed from static config so labels are available before the first API poll.
             if (_playerConfig.Playlists != null && _playerConfig.Playlists.Count > 0)
             {
@@ -390,144 +386,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             }
         }
 
-        // ──────────────────────────────────────────────
-        // Power control
-        // ──────────────────────────────────────────────
-
-        /// <summary>
-        /// Powers on the display by pushing content via pushToScreens.
-        /// Uses the last active playlist, falling back to defaultPlaylistId from config,
-        /// then the first playlist in the known list.
-        /// </summary>
-        public void PowerOn()
-        {
-            // var playlistId = _lastActivePlaylistId
-            //     ?? _playerConfig.DefaultPlaylistId
-            //     ?? (_playlists.Count > 0 ? _playlists[0].Id : null);
-
-            // if (string.IsNullOrEmpty(playlistId))
-            // {
-            //     this.LogWarning("PowerOn: no playlist ID available. " +
-            //         "Configure 'defaultPlaylistId' or ensure playlists are loaded.");
-            //     return;
-            // }
-
-            // this.LogInformation("PowerOn: pushing playlist {0}", playlistId);
-
-            // ApplyOptimisticPlaylistState(playlistId, powerOn: true);
-            // CrestronInvoke.BeginInvoke(_ => PowerOnAsync(playlistId));
-
-            throw new NotImplementedException("PowerOn is not implemented in this version. " +
-                "Please set 'usePushToScreens' to false in the configuration to use updateDevice for power control.");
-        }
-
-        private async void PowerOnAsync(string playlistId)
-        {
-            SetPolling(true);
-            try
-            {
-                var payload = new PushToScreensInput
-                {
-                    DeviceIds = new List<string> { _playerConfig.DeviceId },
-                    CurrentPlaylistId = playlistId,
-                    Type = "NOW"
-                };
-
-                this.LogVerbose(
-                    "[OptiSigns] PowerOnAsync: teamId={0}, payload={1}",
-                    _playerConfig.TeamId,
-                    JsonConvert.SerializeObject(payload));
-
-                var success = await _client.PushToScreensAsync(_playerConfig.TeamId, payload)
-                    .ConfigureAwait(false);
-
-                this.LogVerbose("[OptiSigns] PowerOnAsync result: success={0}", success);
-
-                if (!success)
-                    this.LogWarning("PowerOn: pushToScreens returned false for device {0}",
-                        _playerConfig.DeviceId);
-
-                ScheduleConfirmationPoll();
-            }
-            catch (Exception ex)
-            {
-                this.LogError("Exception in PowerOnAsync: {0}", ex.Message);
-            }
-            finally
-            {
-                SetPolling(false);
-            }
-        }
-
-        /// <summary>
-        /// Powers off the display by setting currentType to NONE via updateDevice.
-        /// Saves the current playlist ID so it can be restored when PowerOn is called.
-        /// </summary>
-        public void PowerOff()
-        {
-            // this.LogInformation("PowerOff: setting currentType=NONE for device {0}", _playerConfig.DeviceId);
-
-            // if (!string.IsNullOrEmpty(_currentPlaylistId))
-            //     _lastActivePlaylistId = _currentPlaylistId;
-
-            // _powerIsOn = false;
-            // _currentPlaylistName = string.Empty;
-            // _currentPlaylistIndex = 0;
-            // PowerIsOnFeedback.FireUpdate();
-            // PowerIsOffFeedback.FireUpdate();
-            // CurrentPlaylistNameFeedback.FireUpdate();
-            // InputSelectFeedback.FireUpdate();
-
-            // CrestronInvoke.BeginInvoke(_ => PowerOffAsync());
-
-            throw new NotImplementedException("PowerOff is not implemented in this version. " +
-                "Please set 'usePushToScreens' to false in the configuration to use updateDevice for power control.");
-        }
-
-        private async void PowerOffAsync()
-        {
-            SetPolling(true);
-            try
-            {
-                var payload = new UpdateDeviceInput { CurrentType = "NONE" };
-
-                this.LogVerbose(
-                    "[OptiSigns] PowerOffAsync: deviceId={0}, teamId={1}, payload={2}",
-                    _playerConfig.DeviceId,
-                    _playerConfig.TeamId,
-                    JsonConvert.SerializeObject(payload));
-
-                var success = await _client.UpdateDeviceAsync(_playerConfig.DeviceId, _playerConfig.TeamId, payload)
-                    .ConfigureAwait(false);
-
-                this.LogVerbose("[OptiSigns] PowerOffAsync result: success={0}", success);
-
-                if (!success)
-                    this.LogWarning("PowerOff: updateDevice returned false for device {0}",
-                        _playerConfig.DeviceId);
-
-                ScheduleConfirmationPoll();
-            }
-            catch (Exception ex)
-            {
-                this.LogError("Exception in PowerOffAsync: {0}", ex.Message);
-            }
-            finally
-            {
-                SetPolling(false);
-            }
-        }
-
-        /// <summary>Toggles power state based on current PowerIsOn feedback.</summary>
-        public void PowerToggle()
-        {
-            // if (_powerIsOn) PowerOff();
-            // else PowerOn();
-
-            throw new NotImplementedException("PowerToggle is not implemented in this version. " +
-                "Please set 'usePushToScreens' to false in the configuration to use updateDevice for power control.");
-        }
-
         /// <summary>
         /// Triggers an immediate poll of both device status and playlist list.
         /// </summary>
@@ -605,47 +463,27 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             SetPolling(true);
             try
             {
-                bool success;
-
-                if (_usePushToScreens)
+                // Use pushToScreens mutation with type "NOW" to immediately display playlist
+                var payload = new PushToScreensInput
                 {
-                    // Use pushToScreens mutation (Phase 2 SDK method)
-                    var payload = new PushToScreensInput
-                    {
-                        DeviceIds = new List<string> { _playerConfig.DeviceId },
-                        CurrentPlaylistId = playlistId,
-                        Type = "NOW"
-                    };
+                    DeviceIds = new List<string> { _playerConfig.DeviceId },
+                    CurrentPlaylistId = playlistId,
+                    Type = "NOW"
+                };
 
-                    this.LogVerbose(
-                        "[OptiSigns] SelectPlaylistByIdAsync (pushToScreens): teamId={0}, playlistId={1}, payload={2}",
-                        _playerConfig.TeamId,
-                        playlistId,
-                        JsonConvert.SerializeObject(payload));
+                this.LogVerbose(
+                    "[OptiSigns] SelectPlaylistByIdAsync (pushToScreens): teamId={0}, playlistId={1}, payload={2}",
+                    _playerConfig.TeamId,
+                    playlistId,
+                    JsonConvert.SerializeObject(payload));
 
-                    success = await _client.PushToScreensAsync(_playerConfig.TeamId, payload)
-                        .ConfigureAwait(false);
-                }
-                else
-                {
-                    // Use updateDevice mutation (documented API method)
-                    // Sets currentType=PLAYLIST and currentAssetId=playlistId
-                    this.LogVerbose(
-                        "[OptiSigns] SelectPlaylistByIdAsync (updateDevice): deviceId={0}, teamId={1}, playlistId={2}",
-                        _playerConfig.DeviceId,
-                        _playerConfig.TeamId,
-                        playlistId);
-
-                    success = await _client.AssignPlaylistAsync(
-                        _playerConfig.DeviceId,
-                        _playerConfig.TeamId,
-                        playlistId).ConfigureAwait(false);
-                }
+                var success = await _client.PushToScreensAsync(_playerConfig.TeamId, payload)
+                    .ConfigureAwait(false);
 
                 this.LogVerbose("[OptiSigns] SelectPlaylistByIdAsync result: success={0}", success);
 
                 if (!success)
-                    this.LogWarning("SelectPlaylistById: API call returned false");
+                    this.LogWarning("SelectPlaylistById: pushToScreens returned false");
 
                 ScheduleConfirmationPoll();
             }
@@ -832,14 +670,10 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
             // ── Digital: ToSIMPL (feedback) ──────────────────────────
             IsOnlineFeedback.LinkInputSig(trilist.BooleanInput[joinMap.IsOnline.JoinNumber]);
-            PowerIsOnFeedback.LinkInputSig(trilist.BooleanInput[joinMap.PowerIsOn.JoinNumber]);
-            PowerIsOffFeedback.LinkInputSig(trilist.BooleanInput[joinMap.PowerIsOff.JoinNumber]);
             IsPollingFeedback.LinkInputSig(trilist.BooleanInput[joinMap.IsPolling.JoinNumber]);
 
             // ── Digital: FromSIMPL (actions) ─────────────────────────
-            trilist.SetSigTrueAction(joinMap.PowerOn.JoinNumber, PowerOn);
-            trilist.SetSigTrueAction(joinMap.PowerOff.JoinNumber, PowerOff);
-            trilist.SetSigTrueAction(joinMap.PowerToggle.JoinNumber, PowerToggle);
+            // Power control removed - playlist selection uses pushToScreens directly
             trilist.SetSigTrueAction(joinMap.PollNow.JoinNumber, PollNow);
             trilist.SetSigTrueAction(joinMap.PageFirst.JoinNumber, FirstPlaylistPage);
             trilist.SetSigTrueAction(joinMap.PageNext.JoinNumber, NextPlaylistPage);
