@@ -26,9 +26,7 @@ The plugin uses a **server/player architecture**:
 
 | Control Surface Operation | OptiSigns API Action                                                        |
 | ------------------------- | --------------------------------------------------------------------------- |
-| Power ON                  | `pushToScreens` — restores last active or default playlist                  |
-| Power OFF                 | `updateDevice` — sets `currentType` to `"NONE"` (blanks screen)             |
-| Input / Playlist select   | `pushToScreens` — pushes selected playlist by 1-based index or direct `_id` |
+| Playlist select           | `pushToScreens` — pushes selected playlist immediately (type: "NOW")        |
 | Poll device status        | `devices` query — refreshes `currentType`, `status`, `lastHeartBeat`        |
 | Poll playlist list        | `playlists` query — refreshes labels for input selection                    |
 | Device discovery          | `devices` query — lists all devices in the OptiSigns account                |
@@ -178,48 +176,60 @@ Join numbers below are **relative to `joinStart`**.
 
 ### Digitals
 
-| Input (From SIMPL)       | Join | Output (To SIMPL) |
-| ------------------------ | ---- | ----------------- |
-|                          | 1    | Is Online fb      |
-| Power On (pulse)         | 2    | Power Is On fb    |
-| Power Off (pulse)        | 3    | Power Is Off fb   |
-| Power Toggle (pulse)     | 4    |                   |
-| Poll Now (pulse)         | 5    | Is Polling fb     |
-| Page First (pulse)       | 6    |                   |
-| Page Next (pulse)        | 7    |                   |
-| Page Previous (pulse)    | 8    |                   |
+| Input (From SIMPL)             | Join | Output (To SIMPL) |
+| ------------------------------ | ---- | ----------------- |
+|                                | 1    | Is Online fb      |
+| Poll Now (pulse)               | 2    | Is Polling fb     |
+| Page First (pulse)             | 3    |                   |
+| Page Next (pulse)              | 4    |                   |
+| Page Previous (pulse)          | 5    |                   |
+| Playlist Item As JSON (toggle) | 6    |                   |
 
 ### Analogs
 
-| Input (From SIMPL)                 | Join | Output (To SIMPL)                                                           |
-| ---------------------------------- | ---- | --------------------------------------------------------------------------- |
-|                                    | 1    | Device Status fb (0=Unknown, 1=Ok/ONLINE, 2=Warning/SLEEP, 3=Error/OFFLINE) |
-|                                    | 5    | Playlist Count fb (total count)                                             |
-| Select Playlist by Index (1-based) | 6    | Select Playlist by Index fb (current playlist index)                        |
+| Input (From SIMPL)                            | Join | Output (To SIMPL)                                |
+| --------------------------------------------- | ---- | ------------------------------------------------ |
+|                                               | 1    | Device Status fb (0=Unknown, 1=ONLINE, 2=SLEEP, 3=OFFLINE) |
+|                                               | 5    | Playlist Count fb (total count)                  |
+| Select Playlist by Absolute Index (1-based)   | 6    | Current Playlist Absolute Index fb               |
+| Select Playlist by Relative Index (1-based)   | 7    | Current Playlist Relative Index fb (on page)     |
 
 ### Serials
 
-| Input (From SIMPL)    | Join  | Output (To SIMPL)              |
-| --------------------- | ----- | ------------------------------ |
-|                       | 1     | Device Name fb                 |
-|                       | 2     | Last HeartBeat fb (ISO 8601)   |
-| Select Playlist by ID | 6     | Current Playlist Name fb       |
-|                       | 11    | Playlist Name[1] fb            |
-|                       | 12    | Playlist Name[2] fb            |
-|                       | …     | …                              |
-|                       | 40    | Playlist Name[30] fb           |
+| Input (From SIMPL)    | Join  | Output (To SIMPL)                                              |
+| --------------------- | ----- | -------------------------------------------------------------- |
+|                       | 1     | Device Name fb                                                 |
+|                       | 2     | Last HeartBeat fb (ISO 8601)                                   |
+| Select Playlist by ID | 6     | Current Playlist Name fb                                       |
+|                       | 11    | Playlist Item[1] fb (JSON or pipe-delimited, see D6)           |
+|                       | 12    | Playlist Item[2] fb                                            |
+|                       | …     | …                                                              |
+|                       | 40    | Playlist Item[30] fb                                           |
+
+#### Player Digital Join Notes
+
+- **D2 PollNow** — Pulse to trigger an immediate device status and playlist poll.
+- **D3–D5 Pagination** — Navigate through playlists when there are more than 30. Page First returns to the beginning.
+- **D6 PlaylistItemAsJsonObject** — Controls the format of playlist items on S11–S40:
+  - **High** (default): JSON format `{"id":"...","name":"..."}`
+  - **Low**: Pipe-delimited format `{ListIndex}|{id}|{name}`
 
 #### Player Analog Join Notes
 
-- **A1 DeviceStatus** — maps the raw OptiSigns API status string to an analog value: `0` = StatusUnknown, `1` = IsOk (`ONLINE`), `2` = InWarning (`SLEEP`), `3` = InError (`OFFLINE`).
+- **A1 DeviceStatus** — Maps the raw OptiSigns API status string to an analog value: `0` = Unknown, `1` = ONLINE, `2` = SLEEP, `3` = OFFLINE.
 - **A5 PlaylistCount** — Total number of playlists available (not limited to 30).
-- **A6 SelectPlaylistByIndex** — 1-based index into the available playlist list. Send from SIMPL to select; feedback reflects the current active playlist. `0` = no playlist active or unknown.
+- **A6 SelectPlaylistByAbsoluteIndex** — 1-based index into the entire playlist list, ignoring pagination. Send from SIMPL to select; feedback reflects the current active playlist's absolute position. `0` = no playlist active or unknown.
+- **A7 SelectPlaylistByRelativeIndex** — 1-based index relative to the current page. On page 2 (offset 30), sending `5` selects playlist 35. Feedback shows the current playlist's position on the visible page, or `0` if the current playlist is not on this page.
 
 #### Player Serial Join Notes
 
 - **S1 DeviceName** — Priority: API device name → config `name` property → device key.
-- **S6 SelectPlaylistById / CurrentPlaylistName** — shared join: send a raw OptiSigns playlist `_id` string from SIMPL to select it immediately without needing to resolve its index. Feedback returns the name of the currently active playlist. Useful for config-driven or event-triggered room logic.
-- **S11–S40 PlaylistName[N]** — individual playlist name strings (S11 = playlist 1, …, S40 = playlist 30). Use D6–D8 pagination when there are more than 30 playlists. Slots beyond the current page are sent as empty strings.
+- **S6 SelectPlaylistById / CurrentPlaylistName** — Shared join: send a raw OptiSigns playlist `_id` string from SIMPL to select it immediately without needing to resolve its index. Feedback returns the name of the currently active playlist. Useful for config-driven or event-triggered room logic.
+- **S11–S40 PlaylistItem[N]** — Playlist data for each slot. Format controlled by D6:
+  - JSON: `{"id":"PGTWJ42a3rw7yN8YR","name":"Main Lobby"}`
+  - Pipe: `1|PGTWJ42a3rw7yN8YR|Main Lobby`
+  
+  Slots beyond the current page are sent as empty strings.
 
 ---
 
@@ -230,9 +240,9 @@ Two independent timers run after `Initialize()` for each player:
 | Timer         | Default Interval                | What It Does                                                         |
 | ------------- | ------------------------------- | -------------------------------------------------------------------- |
 | Status poll   | 30s (`pollIntervalMs`)          | Queries device `currentType`, `status`, `lastHeartBeat`              |
-| Playlist poll | 5min (`playlistPollIntervalMs`) | Refreshes the available playlist list and updates S11–S40, A5, and A6 feedback |
+| Playlist poll | 5min (`playlistPollIntervalMs`) | Refreshes the available playlist list and updates S11–S40, A5, A6, and A7 feedback |
 
-The status poll starts 2 seconds after initialization to let the playlist poll complete first. After a Power On, Power Off, or playlist select command, a one-shot confirmation poll fires 2 seconds later to reconcile optimistic UI state with the actual API response.
+The status poll starts 2 seconds after initialization to let the playlist poll complete first. After a playlist select command, a one-shot confirmation poll fires 2 seconds later to reconcile optimistic UI state with the actual API response.
 
 The device is marked **offline** after 3 consecutive status poll failures. It comes back online on the next successful poll.
 
@@ -243,15 +253,17 @@ The device is marked **offline** after 3 consecutive status poll failures. It co
 Update `programIndex` and `deviceKey` to match your environment. Player device keys are `{serverKey}-{playerKey}`.
 
 ```
-devjson:1 {"deviceKey":"optisignServer-player1", "methodName":"PowerOn", "params":[]}
-devjson:1 {"deviceKey":"optisignServer-player1", "methodName":"PowerOff", "params":[]}
-devjson:1 {"deviceKey":"optisignServer-player1", "methodName":"PowerToggle", "params":[]}
+devjson:1 {"deviceKey":"optisignServer-player1", "methodName":"SelectPlaylistByAbsoluteIndex", "params":[1]}
+devjson:1 {"deviceKey":"optisignServer-player1", "methodName":"SelectPlaylistByAbsoluteIndex", "params":[5]}
 
-devjson:1 {"deviceKey":"optisignServer-player1", "methodName":"SelectPlaylistByIndex", "params":[1]}
-devjson:1 {"deviceKey":"optisignServer-player1", "methodName":"SelectPlaylistByIndex", "params":[2]}
-devjson:1 {"deviceKey":"optisignServer-player1", "methodName":"SelectPlaylistByIndex", "params":[3]}
+devjson:1 {"deviceKey":"optisignServer-player1", "methodName":"SelectPlaylistByRelativeIndex", "params":[1]}
+devjson:1 {"deviceKey":"optisignServer-player1", "methodName":"SelectPlaylistByRelativeIndex", "params":[3]}
 
 devjson:1 {"deviceKey":"optisignServer-player1", "methodName":"SelectPlaylistById", "params":["YOUR_PLAYLIST_ID_HERE"]}
+
+devjson:1 {"deviceKey":"optisignServer-player1", "methodName":"PollNow", "params":[]}
+devjson:1 {"deviceKey":"optisignServer-player1", "methodName":"SetPlaylistItemJsonFormat", "params":[true]}
+devjson:1 {"deviceKey":"optisignServer-player1", "methodName":"SetPlaylistItemJsonFormat", "params":[false]}
 
 devjson:1 {"deviceKey":"optisignServer", "methodName":"FetchDevices", "params":[]}
 ```

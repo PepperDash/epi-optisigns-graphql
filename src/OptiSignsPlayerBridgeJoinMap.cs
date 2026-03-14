@@ -8,25 +8,25 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
     /// JOIN LAYOUT SUMMARY
     /// ───────────────────
     /// Digital 1   IsOnline            ToSIMPL      High when API contact is healthy
-    /// Digital 2   PowerOn             FromSIMPL    Pulse to power on (restore last/default playlist)
-    /// Digital 2   PowerIsOn           ToSIMPL      High when currentType != NONE
-    /// Digital 3   PowerOff            FromSIMPL    Pulse to power off (sets currentType = NONE)
-    /// Digital 3   PowerIsOff          ToSIMPL      High when currentType == NONE
-    /// Digital 4   PowerToggle         FromSIMPL    Pulse to toggle power state
-    /// Digital 5   PollNow             FromSIMPL    Pulse to trigger status + playlist poll
-    /// Digital 5   IsPolling           ToSIMPL      High while an async API call is in progress
+    /// Digital 2   PollNow             FromSIMPL    Pulse to trigger status + playlist poll
+    /// Digital 2   IsPolling           ToSIMPL      High while an async API call is in progress
+    /// Digital 3   PageFirst           FromSIMPL    Navigate to first page of playlists
+    /// Digital 4   PageNext            FromSIMPL    Advance to next page of playlists
+    /// Digital 5   PreviousPage        FromSIMPL    Go back to previous page of playlists
+    /// Digital 6   PlaylistItemAsJson  FromSIMPL    High=JSON format, Low=Pipe-delimited
     ///
-    /// Analog  1   DeviceStatus        ToSIMPL      0=Unknown, 1=Ok, 2=Warning, 3=Error
+    /// Analog  1   DeviceStatus        ToSIMPL      0=Unknown, 1=ONLINE, 2=SLEEP, 3=OFFLINE
     /// Analog  5   PlaylistCount       ToSIMPL      Total number of playlists available
-    /// Analog  6   SelectPlaylistByIndex ToFromSIMPL Page-relative 1-based index; 0 = not on page
+    /// Analog  6   SelectByAbsIndex    ToFromSIMPL  Absolute 1-based index; 0 = unknown
+    /// Analog  7   SelectByRelIndex    ToFromSIMPL  Page-relative 1-based index; 0 = not on page
     ///
-    /// Serial  1   DeviceName          ToSIMPL      Plugin device name (from Essentials config)
-    /// Serial  2   LastHeartBeat       ToSIMPL      ISO 8601 timestamp of last device heartbeat
+    /// Serial  1   DeviceName          ToSIMPL      Plugin device name
+    /// Serial  2   LastHeartBeat       ToSIMPL      ISO 8601 timestamp of last heartbeat
     /// Serial  6   SelectPlaylistById  FromSIMPL    Send a playlist _id string to select directly
     /// Serial  6   CurrentPlaylistName ToSIMPL      Name of the currently active playlist
-    /// Serial  11  PlaylistName[1]     ToSIMPL      Name of playlist 1 (empty if slot unused)
+    /// Serial  11  PlaylistItem[1]     ToSIMPL      JSON or pipe-delimited playlist data (see D6)
     ///   ...
-    /// Serial  40  PlaylistName[30]    ToSIMPL      Name of playlist 30 (empty if slot unused)
+    /// Serial  40  PlaylistItem[30]    ToSIMPL      (empty if slot unused)
     /// </summary>
     public class OptiSignsBridgeJoinMap : JoinMapBaseAdvanced
     {
