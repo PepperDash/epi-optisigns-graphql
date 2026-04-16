@@ -153,12 +153,11 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                             return string.Empty;
 
                         var playlist = _playlists[actualIndex];
-                        var listIndex = actualIndex + 1; // 1-based index
 
                         if (_playlistItemAsJsonFormat)
                             return JsonConvert.SerializeObject(new { id = playlist.Id, name = playlist.Name });
                         else
-                            return string.Format("{0}|{1}|{2}", listIndex, playlist.Id, playlist.Name);
+                            return playlist.Name ?? string.Empty;
                     });
             }
         }
@@ -622,7 +621,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// <summary>
         /// Sets the format for playlist items sent to the bridge.
         /// When true, items are sent as JSON: {"id":"...","name":"..."}.
-        /// When false, items are sent as pipe-delimited: {ListIndex}|{id}|{name}.
+        /// When false, items are sent as the playlist name only.
         /// </summary>
         public void SetPlaylistItemJsonFormat(bool useJson)
         {

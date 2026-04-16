@@ -24,7 +24,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
     /// Serial  2   LastHeartBeat       ToSIMPL      ISO 8601 timestamp of last heartbeat
     /// Serial  6   SelectPlaylistById  FromSIMPL    Send a playlist _id string to select directly
     /// Serial  6   CurrentPlaylistName ToSIMPL      Name of the currently active playlist
-    /// Serial  11  PlaylistItem[1]     ToSIMPL      JSON or pipe-delimited playlist data (see D6)
+    /// Serial  11  PlaylistItem[1]     ToSIMPL      JSON or name only (see D6)
     ///   ...
     /// Serial  40  PlaylistItem[30]    ToSIMPL      (empty if slot unused)
     /// </summary>
@@ -100,7 +100,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             {
                 Description = "Controls playlist item format on S11-S40. " +
                               "High = JSON format: {\"id\":\"...\",\"name\":\"...\"}. " +
-                              "Low = Pipe-delimited: {ListIndex}|{id}|{name}. " +
+                              "Low = Name only. " +
                               "Default is JSON (high).",
                 JoinCapabilities = eJoinCapabilities.FromSIMPL,
                 JoinType = eJoinType.Digital
@@ -212,7 +212,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             new JoinMetadata
             {
                 Description = "Playlist data. Format controlled by D6 (PlaylistItemAsJsonObject): " +
-                              "JSON: {\"id\":\"...\",\"name\":\"...\"} or Pipe: {ListIndex}|{id}|{name}. " +
+                              "JSON: {\"id\":\"...\",\"name\":\"...\"} or Name only. " +
                               "S11 = playlist 1, S12 = playlist 2, ..., S40 = playlist 30. " +
                               "Slots beyond the current PlaylistCount are sent as empty strings.",
                 JoinCapabilities = eJoinCapabilities.ToSIMPL,
