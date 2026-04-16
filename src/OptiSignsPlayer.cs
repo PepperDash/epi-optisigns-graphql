@@ -33,6 +33,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         private readonly OptiSignsGraphQLClient client;
         private readonly int pollIntervalMs;
         private readonly int playlistPollIntervalMs;
+        private readonly int playlistLimit;
 
         // ──────────────────────────────────────────────
         // Internal state
@@ -101,19 +102,22 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// <param name="client">Shared GraphQL client from the parent server</param>
         /// <param name="pollIntervalMs">Status poll interval in milliseconds</param>
         /// <param name="playlistPollIntervalMs">Playlist poll interval in milliseconds</param>
+        /// <param name="playlistLimit">Maximum number of playlists to fetch from API</param>
         public OptiSignsPlayer(
             string key,
             string name,
             OptiSignsPlayerConfig playerConfig,
             OptiSignsGraphQLClient client,
             int pollIntervalMs,
-            int playlistPollIntervalMs)
+            int playlistPollIntervalMs,
+            int playlistLimit)
             : base(key, name)
         {
 			this.playerConfig = playerConfig;
 			this.client = client;
 			this.pollIntervalMs = pollIntervalMs;
 			this.playlistPollIntervalMs = playlistPollIntervalMs;
+            this.playlistLimit = playlistLimit;
             // Seed from static config so labels are available before the first API poll.
             if (this.playerConfig.Playlists != null && this.playerConfig.Playlists.Count > 0)
             {
@@ -335,7 +339,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             try
             {
-                var apiPlaylists = await client.GetPlaylistsAsync().ConfigureAwait(false);
+                var apiPlaylists = await client.GetPlaylistsAsync(playlistLimit).ConfigureAwait(false);
 
                 if (apiPlaylists == null)
                 {

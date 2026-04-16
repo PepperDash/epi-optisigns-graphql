@@ -8,6 +8,7 @@ using PepperDash.Core;
 using PepperDash.Core.Logging;
 using PepperDash.Essentials.Core;
 using PepperDash.Essentials.Core.Bridges;
+using CrestronIO = Crestron.SimplSharp.CrestronIO;
 
 namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 {
@@ -163,7 +164,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     playerConfig,
                     _client,
                     _props.PollIntervalMs,
-                    _props.PlaylistPollIntervalMs);
+                    _props.PlaylistPollIntervalMs,
+                    _props.PlaylistLimit);
 
                 _players.Add(player);
 
@@ -264,6 +266,88 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             catch (Exception ex)
             {
                 this.LogError("Exception in FetchDevicesAsync: {0}", ex.Message);
+            }
+            finally
+            {
+                _isFetching = false;
+                IsFetchingFeedback.FireUpdate();
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        // Playlist Export
+        // ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Exports all playlists from the OptiSigns account to a JSON file.
+        /// File is saved as: YYYY-MM-dd-optisigns-playlist-export.json
+        /// </summary>
+        public void ExportPlaylistsToJson()
+        {
+            CrestronInvoke.BeginInvoke(_ => ExportPlaylistsToJsonAsync());
+        }
+
+        private async void ExportPlaylistsToJsonAsync()
+        {
+            if (_isFetching)
+            {
+                this.LogDebug("ExportPlaylists: already fetching, ignoring request");
+                return;
+            }
+
+            _isFetching = true;
+            IsFetchingFeedback.FireUpdate();
+
+            try
+            {
+                this.LogDebug("Fetching playlists for export...");
+
+                var playlists = await _client.GetPlaylistsAsync(_props.PlaylistLimit).ConfigureAwait(false);
+
+                if (playlists == null)
+                {
+                    this.LogWarning("ExportPlaylists: API returned null");
+                    return;
+                }
+
+                if (playlists.Count == 0)
+                {
+                    this.LogWarning("ExportPlaylists: No playlists found");
+                    return;
+                }
+
+                // Build export data with id and name
+                var exportData = new List<object>();
+                foreach (var playlist in playlists)
+                {
+                    exportData.Add(new
+                    {
+                        id = playlist.Id,
+                        name = playlist.Name
+                    });
+                }
+
+                // Format filename: YYYY-MM-dd-optisigns-playlist-export.json
+                var dateStr = DateTime.Now.ToString("yyyy-MM-dd");
+                var filename = string.Format("{0}-optisigns-playlist-export.json", dateStr);
+                var programFolder = string.Format("program{0}", InitialParametersClass.ApplicationNumber);
+                var userProgramPath = CrestronIO.Path.Combine("\\user", programFolder);
+                var filePath = CrestronIO.Path.Combine(userProgramPath, filename);
+
+                // Serialize with formatting for readability
+                var json = JsonConvert.SerializeObject(exportData, Formatting.Indented);
+
+                // Write to file
+                using (var writer = new CrestronIO.StreamWriter(filePath, false, Encoding.UTF8))
+                {
+                    writer.Write(json);
+                }
+
+                this.LogInformation("Exported {0} playlists to: {1}", playlists.Count, filePath);
+            }
+            catch (Exception ex)
+            {
+                this.LogError("Exception in ExportPlaylistsToJsonAsync: {0}", ex.Message);
             }
             finally
             {
@@ -385,6 +469,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             trilist.SetSigTrueAction(joinMap.PageFirst.JoinNumber, FirstDevicePage);
             trilist.SetSigTrueAction(joinMap.PageNext.JoinNumber, NextDevicePage);
             trilist.SetSigTrueAction(joinMap.PreviousPage.JoinNumber, PreviousDevicePage);
+            trilist.SetSigTrueAction(joinMap.ExportPlaylistAsJson.JoinNumber, ExportPlaylistsToJson);
 
             // ── Analog: ToSIMPL ───────────────────────────────────────
             ConfiguredPlayerCountFeedback.LinkInputSig(

@@ -13,6 +13,10 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
     /// Digital 1   IsOnline              ToSIMPL      High when API contact is healthy
     /// Digital 2   FetchDevices          FromSIMPL    Pulse to trigger device discovery
     /// Digital 2   IsFetching            ToSIMPL      High while fetching devices
+    /// Digital 3   PageFirst             FromSIMPL    Navigate to first page of devices
+    /// Digital 4   PageNext              FromSIMPL    Advance to next page of devices
+    /// Digital 5   PreviousPage          FromSIMPL    Go back to previous page
+    /// Digital 6   ExportPlaylistAsJson  FromSIMPL    Pulse to export playlists to JSON file
     ///
     /// Analog  1   ConfiguredPlayerCount ToSIMPL      Number of players configured in config
     /// Analog  2   DiscoveredDeviceCount ToSIMPL      Number of devices discovered from API
@@ -84,6 +88,16 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             new JoinMetadata
             {
                 Description = "Pulse from SIMPL to go back to the previous page of devices.",
+                JoinCapabilities = eJoinCapabilities.FromSIMPL,
+                JoinType = eJoinType.Digital
+            });
+
+        [JoinName("ExportPlaylistAsJson")]
+        public JoinDataComplete ExportPlaylistAsJson = new JoinDataComplete(
+            new JoinData { JoinNumber = 6, JoinSpan = 1 },
+            new JoinMetadata
+            {
+                Description = "Pulse from SIMPL to export the playlist as JSON.",
                 JoinCapabilities = eJoinCapabilities.FromSIMPL,
                 JoinType = eJoinType.Digital
             });

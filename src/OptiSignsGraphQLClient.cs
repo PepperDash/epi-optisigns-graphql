@@ -89,8 +89,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         // We attempt it directly. GetPlaylistsAsync returns null if the endpoint
         // is not yet live — the caller falls back to the config-provided list.
         private static readonly string PlaylistsQuery =
-            @"query {
-                playlists(query: {}) {
+            @"query GetPlaylists($limit: Int) {
+                playlists(query: { limit: $limit }) {
+                    totalCount
                     page {
                         edges {
                             node {
@@ -174,14 +175,36 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// Fetches the full playlist list for the account.
         /// Returns null if the endpoint is unavailable or returns an error.
         /// The caller should fall back to the config-provided list when null is returned.
+        /// 
+        /// If the API returns totalCount greater than the initial limit, a second request
+        /// is made with the actual totalCount to fetch all playlists.
         /// </summary>
-        public async Task<List<PlaylistNode>> GetPlaylistsAsync()
+        /// <param name="limit">Initial limit for playlists to fetch. Default 100.</param>
+        public async Task<List<PlaylistNode>> GetPlaylistsAsync(int limit = 100)
         {
-            var data = await ExecuteAsync<PlaylistsQueryData>(PlaylistsQuery, null)
+            var variables = new PlaylistsQueryVariables { Limit = limit };
+            var data = await ExecuteAsync<PlaylistsQueryData>(PlaylistsQuery, variables)
                 .ConfigureAwait(false);
 
             if (data?.Playlists?.Page?.Edges == null)
                 return null;
+
+            var totalCount = data.Playlists.TotalCount;
+            var fetchedCount = data.Playlists.Page.Edges.Count;
+
+            // If there are more playlists than we fetched, re-fetch with the full count
+            if (totalCount > fetchedCount)
+            {
+                this.LogDebug("Playlist count {0} exceeds initial limit {1}, re-fetching all", 
+                    totalCount, limit);
+
+                variables = new PlaylistsQueryVariables { Limit = totalCount };
+                data = await ExecuteAsync<PlaylistsQueryData>(PlaylistsQuery, variables)
+                    .ConfigureAwait(false);
+
+                if (data?.Playlists?.Page?.Edges == null)
+                    return null;
+            }
 
             var result = new List<PlaylistNode>();
             foreach (var edge in data.Playlists.Page.Edges)
@@ -190,6 +213,23 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     result.Add(edge.Node);
             }
             return result;
+        }
+
+        /// <summary>
+        /// Gets the total number of playlists available in the account.
+        /// Returns -1 if the endpoint is unavailable or returns an error.
+        /// </summary>
+        public async Task<int> GetPlaylistCountAsync()
+        {
+            // Fetch with limit=1 just to get totalCount efficiently
+            var variables = new PlaylistsQueryVariables { Limit = 1 };
+            var data = await ExecuteAsync<PlaylistsQueryData>(PlaylistsQuery, variables)
+                .ConfigureAwait(false);
+
+            if (data?.Playlists == null)
+                return -1;
+
+            return data.Playlists.TotalCount;
         }
 
         /// <summary>

@@ -33,6 +33,14 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         public int PlaylistPollIntervalMs { get; set; }
 
         /// <summary>
+        /// Maximum number of playlists to fetch from the API per request.
+        /// The API default is 50; increase this if you have more playlists.
+        /// Default: 100.
+        /// </summary>
+        [JsonProperty("playlistLimit")]
+        public int PlaylistLimit { get; set; }
+
+        /// <summary>
         /// List of OptiSigns players (screens) managed by this server.
         /// Each player has its own deviceId, teamId, and playlist configuration.
         /// </summary>
@@ -43,6 +51,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             PollIntervalMs = 30000;
             PlaylistPollIntervalMs = 300000;
+            PlaylistLimit = 100;
             Players = new List<OptiSignsPlayerConfig>();
         }
     }
