@@ -14,6 +14,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
     /// Digital 4   PageNext            FromSIMPL    Advance to next page of playlists
     /// Digital 5   PreviousPage        FromSIMPL    Go back to previous page of playlists
     /// Digital 6   PlaylistItemAsJson  FromSIMPL    High=JSON format, Low=Name only
+    /// Digital 7   PlaylistSelectionBusy ToSIMPL    High while playlist selection is in progress
     ///
     /// Analog  1   DeviceStatus        ToSIMPL      0=Unknown, 1=ONLINE, 2=SLEEP, 3=OFFLINE
     /// Analog  5   PlaylistCount       ToSIMPL      Total number of playlists available
@@ -66,6 +67,17 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 JoinType = eJoinType.Digital
             });
 
+        [JoinName("PlaylistSelectionBusy")]
+        public JoinDataComplete PlaylistSelectionBusy = new JoinDataComplete(
+            new JoinData { JoinNumber = 3, JoinSpan = 1 },
+            new JoinMetadata
+            {
+                Description = "Indicates whether a playlist selection is currently in progress. " +
+                              "High = In progress, Low = Not in progress.",
+                JoinCapabilities = eJoinCapabilities.ToSIMPL,
+                JoinType = eJoinType.Digital
+            });
+
         [JoinName("PageFirst")]
         public JoinDataComplete PageFirst = new JoinDataComplete(
             new JoinData { JoinNumber = 3, JoinSpan = 1 },
@@ -108,8 +120,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 JoinCapabilities = eJoinCapabilities.FromSIMPL,
                 JoinType = eJoinType.Digital
             });
-
-
 
         #endregion
 

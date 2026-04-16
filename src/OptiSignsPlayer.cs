@@ -48,6 +48,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         private string lastHeartBeat;
         private int currentPlaylistIndex;   // 1-based; 0 = unknown / none
         private bool isPolling;
+        private bool playlistSelectionBusy;
 
         // Resolved playlist list. Written atomically (reference swap) from the poll thread.
         private List<PlaylistNode> playlists = new List<PlaylistNode>();
@@ -77,6 +78,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         public BoolFeedback PowerIsOnFeedback { get; private set; }
         public BoolFeedback PowerIsOffFeedback { get; private set; }
         public BoolFeedback IsPollingFeedback { get; private set; }
+        public BoolFeedback PlaylistSelectionBusyFeedback { get; private set; }
         public IntFeedback AbsoluteInputSelectFeedback { get; private set; }
         public IntFeedback RelativeInputSelectFeedback { get; private set; }
         public IntFeedback PlaylistCountFeedback { get; private set; }
@@ -124,6 +126,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             PowerIsOnFeedback = new BoolFeedback(key + "-PowerIsOn", () => powerIsOn);
             PowerIsOffFeedback = new BoolFeedback(key + "-PowerIsOff", () => !powerIsOn);
             IsPollingFeedback = new BoolFeedback(key + "-IsPolling", () => isPolling);
+            PlaylistSelectionBusyFeedback = new BoolFeedback(key + "-PlaylistSelectionBusy", () => playlistSelectionBusy);
             AbsoluteInputSelectFeedback = new IntFeedback(key + "-AbsoluteInputSelect", () => currentPlaylistIndex);
             RelativeInputSelectFeedback = new IntFeedback(key + "-RelativeInputSelect", () => GetPageRelativePlaylistIndex());
 			DeviceNameFeedback = new StringFeedback(key + "-DeviceName", 
@@ -480,6 +483,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         private async void SelectPlaylistByIdAsync(string playlistId)
         {
             SetPolling(true);
+            SetPlaylistSelectionBusy(true);
             try
             {
                 // Use pushToScreens mutation with type "NOW" to immediately display playlist
@@ -509,6 +513,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             finally
             {
                 SetPolling(false);
+                SetPlaylistSelectionBusy(false);
             }
         }
 
@@ -572,6 +577,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         private async void AssignPlaylistAssetByIdAsync(string playlistId)
         {
             SetPolling(true);
+            SetPlaylistSelectionBusy(true);
             try
             {
                 // Use updateDevice mutation with currentType=PLAYLIST and currentAssetId
@@ -597,6 +603,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             finally
             {
                 SetPolling(false);
+                SetPlaylistSelectionBusy(false);
             }
         }
 
@@ -682,6 +689,13 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             IsPollingFeedback.FireUpdate();
         }
 
+        private void SetPlaylistSelectionBusy(bool value)
+        {
+            if (playlistSelectionBusy == value) return;
+            playlistSelectionBusy = value;
+            PlaylistSelectionBusyFeedback.FireUpdate();
+        }
+
         /// <summary>
         /// Sets the format for playlist items sent to the bridge.
         /// When true, items are sent as JSON: {"id":"...","name":"..."}.
@@ -760,6 +774,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             PowerIsOnFeedback.FireUpdate();
             PowerIsOffFeedback.FireUpdate();
             IsPollingFeedback.FireUpdate();
+            PlaylistSelectionBusyFeedback.FireUpdate();
             AbsoluteInputSelectFeedback.FireUpdate();
             RelativeInputSelectFeedback.FireUpdate();
             DeviceNameFeedback.FireUpdate();
@@ -789,6 +804,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             // ── Digital: ToSIMPL (feedback) ──────────────────────────
             IsOnlineFeedback.LinkInputSig(trilist.BooleanInput[joinMap.IsOnline.JoinNumber]);
             IsPollingFeedback.LinkInputSig(trilist.BooleanInput[joinMap.IsPolling.JoinNumber]);
+            PlaylistSelectionBusyFeedback.LinkInputSig(trilist.BooleanInput[joinMap.PlaylistSelectionBusy.JoinNumber]);
 
             // ── Digital: FromSIMPL (actions) ─────────────────────────
             // Power control removed - playlist selection uses pushToScreens directly
