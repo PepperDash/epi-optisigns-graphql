@@ -174,15 +174,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             base.Initialize();
 
-            this.LogInformation("Initializing OptiSigns player. DeviceId={0}, TeamId={1}",
+            this.LogInformation("Initializing. DeviceId={0}, TeamId={1}",
                 playerConfig.DeviceId, playerConfig.TeamId);
-
-            this.LogVerbose(
-                "[OptiSigns] Player init config: PollIntervalMs={0}, PlaylistPollIntervalMs={1}, DefaultPlaylistId={2}, StaticPlaylists={3}",
-                pollIntervalMs,
-                playlistPollIntervalMs,
-                playerConfig.DefaultPlaylistId ?? "(none)",
-                playlists.Count);
 
             if (string.IsNullOrEmpty(playerConfig.TeamId) ||
                 string.IsNullOrEmpty(playerConfig.DeviceId))
@@ -229,14 +222,13 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 if (node == null)
                 {
                     consecutiveFailures++;
-                    this.LogVerbose(
-                        "[OptiSigns] Status poll returned null. ConsecutiveFailures={0}, MaxBeforeOffline={1}",
+                    this.LogVerbose("Poll returned null (failures: {0}/{1})",
                         consecutiveFailures, maxFailuresBeforeOffline);
                     if (consecutiveFailures >= maxFailuresBeforeOffline && isOnline)
                     {
                         isOnline = false;
                         IsOnlineFeedback.FireUpdate();
-                        this.LogWarning("OptiSigns player offline after {0} consecutive failures",
+                        this.LogWarning("Player offline after {0} consecutive failures",
                             consecutiveFailures);
                     }
                     return;
@@ -245,19 +237,16 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 consecutiveFailures = 0;
 
                 this.LogVerbose(
-                    "[OptiSigns] Status poll result: CurrentType={0}, Status={1}, CurrentPlaylistId={2}, CurrentAssetId={3}, LastHeartBeat={4}, DeviceName={5}",
-                    node.CurrentType ?? "(null)",
-                    node.Status ?? "(null)",
-                    node.CurrentPlaylistId ?? "(null)",
-                    node.CurrentAssetId ?? "(null)",
-                    node.LastHeartBeat ?? "(null)",
-                    node.DeviceName ?? "(null)");
+                    "Poll: Type={0}, PlaylistId={1}, AssetId={2}",
+                    node.CurrentType ?? "-",
+                    node.CurrentPlaylistId ?? "-",
+                    node.CurrentAssetId ?? "-");
 
                 if (!isOnline)
                 {
                     isOnline = true;
                     IsOnlineFeedback.FireUpdate();
-                    this.LogInformation("OptiSigns player is online");
+                    this.LogInformation("Player online");
                 }
 
                 currentType = node.CurrentType;
@@ -267,9 +256,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
                 if (newPowerIsOn != powerIsOn)
                 {
-                    this.LogVerbose(
-                        "[OptiSigns] Power state changed: {0} -> {1} (currentType={2})",
-                        powerIsOn, newPowerIsOn, node.CurrentType);
+                    this.LogDebug("Power: {0} -> {1}", powerIsOn, newPowerIsOn);
                     powerIsOn = newPowerIsOn;
                     PowerIsOnFeedback.FireUpdate();
                     PowerIsOffFeedback.FireUpdate();
@@ -282,11 +269,10 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     ? node.CurrentPlaylistId
                     : node.CurrentAssetId;
 
-                this.LogVerbose(
-                    "[OptiSigns] Effective playlist calculation: CurrentPlaylistId={0}, CurrentAssetId={1}, effectiveId={2}",
-                    node.CurrentPlaylistId ?? "(null)",
-                    node.CurrentAssetId ?? "(null)",
-                    effectivePlaylistId ?? "(null)");
+                this.LogVerbose("EffectiveId: {0} (PlaylistId={1}, AssetId={2})",
+                    effectivePlaylistId ?? "-",
+                    node.CurrentPlaylistId ?? "-",
+                    node.CurrentAssetId ?? "-");
 
                 // Track last known playlist for power-on restore
                 if (powerIsOn && !string.IsNullOrEmpty(effectivePlaylistId))
@@ -294,12 +280,10 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
                 if (effectivePlaylistId != currentPlaylistId)
                 {
-                    this.LogVerbose(
-                        "[OptiSigns] Playlist changed: Id={0} -> {1}, Name={2}, Index={3}",
-                        currentPlaylistId ?? "(null)",
-                        effectivePlaylistId ?? "(null)",
+                    this.LogDebug("Playlist: '{0}' [{1}] (was: {2})",
                         ResolvePlaylistName(effectivePlaylistId),
-                        ResolvePlaylistIndex(effectivePlaylistId));
+                        ResolvePlaylistIndex(effectivePlaylistId),
+                        currentPlaylistId ?? "-");
                     currentPlaylistId = effectivePlaylistId;
                     currentPlaylistName = ResolvePlaylistName(currentPlaylistId);
                     currentPlaylistIndex = ResolvePlaylistIndex(currentPlaylistId);
@@ -311,9 +295,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 var mappedStatus = MapDeviceStatus(node.Status);
                 if (mappedStatus != deviceStatus)
                 {
-                    this.LogVerbose(
-                        "[OptiSigns] Device status changed: {0} -> {1} (raw={2})",
-                        deviceStatus, mappedStatus, node.Status ?? "(null)");
+                    this.LogDebug("Status: {0} -> {1}", deviceStatus, mappedStatus);
                     deviceStatus = mappedStatus;
                     DeviceStatusFeedback.FireUpdate();
                 }
@@ -327,7 +309,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 // Update device name from API response
                 if (!string.IsNullOrEmpty(node.DeviceName) && node.DeviceName != deviceName)
                 {
-                    this.LogVerbose("[OptiSigns] Device name updated: {0}", node.DeviceName);
+                    this.LogDebug("DeviceName: {0}", node.DeviceName);
                     deviceName = node.DeviceName;
                     DeviceNameFeedback.FireUpdate();
                 }
@@ -354,31 +336,26 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
                 if (apiPlaylists == null)
                 {
-                    this.LogVerbose(
-                        "[OptiSigns] Playlist poll returned null. Keeping {0} existing playlists from config.",
-                        playlists.Count);
-                    this.LogDebug(
-                        "Playlist API returned null — using config-provided list ({0} items)",
-                        playlists.Count);
+                    this.LogVerbose("Playlist API returned null, keeping {0} from config", playlists.Count);
                     FirePlaylistNameFeedbacks();
                     return;
                 }
 
                 if (apiPlaylists.Count == 0)
                 {
-                    this.LogWarning("Playlist API returned an empty list");
+                    this.LogWarning("Playlist API returned empty list");
                     FirePlaylistNameFeedbacks();
                     return;
                 }
 
                 // Atomic reference swap — safe on CLR without a lock.
                 playlists = apiPlaylists;
-                this.LogDebug("Playlist list refreshed: {0} playlists", playlists.Count);
+                this.LogDebug("Playlists refreshed: {0} items", playlists.Count);
 
-                this.LogVerbose(
-                    "[OptiSigns] Playlist poll result ({0} playlists):\n{1}",
-                    playlists.Count,
-                    JsonConvert.SerializeObject(playlists, Formatting.Indented));
+                // Log playlist names at verbose level for debugging
+                var playlistSummary = string.Join(", ", playlists.Select((p, i) =>
+                    string.Format("[{0}] {1}", i + 1, p.Name)));
+                this.LogVerbose("Playlists: {0}", playlistSummary);
 
                 var newIndex = ResolvePlaylistIndex(currentPlaylistId);
                 if (newIndex != currentPlaylistIndex)
@@ -408,7 +385,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// </summary>
         public void PollNow()
         {
-            this.LogDebug("PollNow: triggering device status and playlist polls");
+            this.LogDebug("PollNow triggered");
             CrestronInvoke.BeginInvoke(_ =>
             {
                 PollDeviceStatusAsync();
@@ -441,8 +418,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             }
 
             var playlist = playlists[index - 1];
-            this.LogDebug("SelectPlaylistByAbsoluteIndex({0}): '{1}' (id={2})",
-                index, playlist.Name, playlist.Id);
+            this.LogDebug("SelectPlaylist[{0}]: '{1}'", index, playlist.Name);
 
             SelectPlaylistById(playlist.Id);
         }
@@ -477,8 +453,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             }
 
             var playlist = playlists[actualIndex];
-            this.LogDebug("SelectPlaylistByRelativeIndex({0}): page offset={1}, actual index={2}, '{3}' (id={4})",
-                index, playlistGroupOffset, actualIndex + 1, playlist.Name, playlist.Id);
+            this.LogDebug("SelectPlaylist[rel {0} -> abs {1}]: '{2}'",
+                index, actualIndex + 1, playlist.Name);
 
             SelectPlaylistById(playlist.Id);
         }
@@ -514,19 +490,15 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     Type = "NOW"
                 };
 
-                this.LogVerbose(
-                    "[OptiSigns] SelectPlaylistByIdAsync (pushToScreens): teamId={0}, playlistId={1}, payload={2}",
-                    playerConfig.TeamId,
-                    playlistId,
-                    JsonConvert.SerializeObject(payload));
+                this.LogVerbose("pushToScreens: {0}", playlistId);
 
                 var success = await client.PushToScreensAsync(playerConfig.TeamId, payload)
                     .ConfigureAwait(false);
 
-                this.LogVerbose("[OptiSigns] SelectPlaylistByIdAsync result: success={0}", success);
+                this.LogDebug("pushToScreens result: {0}", success ? "OK" : "FAILED");
 
                 if (!success)
-                    this.LogWarning("SelectPlaylistById: pushToScreens returned false");
+                    this.LogWarning("pushToScreens returned false");
 
                 ScheduleConfirmationPoll();
             }
@@ -553,15 +525,13 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             if (index < 1 || index > playlists.Count)
             {
-                this.LogWarning(
-                    "AssignPlaylistAssetByIndex: index {0} out of range (1-{1})",
+                this.LogWarning("AssignPlaylist: index {0} out of range (1-{1})",
                     index, playlists.Count);
                 return;
             }
 
             var playlist = playlists[index - 1];
-            this.LogDebug("AssignPlaylistAssetByIndex({0}): '{1}' (id={2})",
-                index, playlist.Name, playlist.Id);
+            this.LogDebug("AssignPlaylist[{0}]: '{1}'", index, playlist.Name);
             AssignPlaylistAssetById(playlist.Id);
         }
 
@@ -572,8 +542,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             if (relativeIndex < 1 || relativeIndex > MaxPlaylistBridgeCount)
             {
-                this.LogWarning(
-                    "AssignPlaylistAssetByRelativeIndex: index {0} out of range (1-{1})",
+                this.LogWarning("AssignPlaylist: index {0} out of range (1-{1})",
                     relativeIndex, MaxPlaylistBridgeCount);
                 return;
             }
@@ -589,11 +558,11 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             if (string.IsNullOrEmpty(playlistId))
             {
-                this.LogWarning("AssignPlaylistAssetById: playlistId is null or empty");
+                this.LogWarning("AssignPlaylist: empty ID");
                 return;
             }
 
-            this.LogInformation("AssignPlaylistAssetById: {0}", playlistId);
+            this.LogInformation("AssignPlaylist: {0}", playlistId);
 
             lastActivePlaylistId = playlistId;
             ApplyOptimisticPlaylistState(playlistId, powerOn: true);
@@ -607,21 +576,17 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             {
                 // Use updateDevice mutation with currentType=PLAYLIST and currentAssetId
                 // This properly switches the device to playlist mode (not asset mode)
-                this.LogVerbose(
-                    "[OptiSigns] AssignPlaylistAssetByIdAsync (updateDevice): deviceId={0}, teamId={1}, playlistId={2}",
-                    playerConfig.DeviceId,
-                    playerConfig.TeamId,
-                    playlistId);
+                this.LogVerbose("updateDevice (assign): {0}", playlistId);
 
                 var success = await client.AssignPlaylistAsync(
                     playerConfig.DeviceId,
                     playerConfig.TeamId,
                     playlistId).ConfigureAwait(false);
 
-                this.LogVerbose("[OptiSigns] AssignPlaylistAssetByIdAsync result: success={0}", success);
+                this.LogDebug("updateDevice result: {0}", success ? "OK" : "FAILED");
 
                 if (!success)
-                    this.LogWarning("AssignPlaylistAssetById: AssignPlaylistAsync returned false");
+                    this.LogWarning("AssignPlaylist returned false");
 
                 ScheduleConfirmationPoll();
             }
@@ -727,7 +692,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             if (playlistItemAsJsonFormat == useJson) return;
 
             playlistItemAsJsonFormat = useJson;
-            this.LogDebug("PlaylistItemJsonFormat set to: {0}", useJson);
+            this.LogDebug("PlaylistFormat: {0}", useJson ? "JSON" : "NameOnly");
             FirePlaylistNameFeedbacks();
         }
 
@@ -745,12 +710,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             if (playlistGroupOffset == 0)
             {
-                this.LogDebug("FirstPlaylistPage: already at beginning");
+                this.LogDebug("Page: already at beginning");
                 return;
             }
 
             playlistGroupOffset = 0;
-            this.LogDebug("FirstPlaylistPage: offset now 0");
+            this.LogDebug("Page: first (offset 0)");
             FirePlaylistNameFeedbacks();
             RelativeInputSelectFeedback.FireUpdate();
         }
@@ -762,12 +727,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             if (playlistGroupOffset + MaxPlaylistBridgeCount >= playlists.Count)
             {
-                this.LogDebug("NextPlaylistPage: already at end");
+                this.LogDebug("Page: already at end");
                 return;
             }
 
             playlistGroupOffset += MaxPlaylistBridgeCount;
-            this.LogDebug("NextPlaylistPage: offset now {0}", playlistGroupOffset);
+            this.LogDebug("Page: next (offset {0})", playlistGroupOffset);
             FirePlaylistNameFeedbacks();
             RelativeInputSelectFeedback.FireUpdate();
         }
@@ -779,12 +744,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             if (playlistGroupOffset <= 0)
             {
-                this.LogDebug("PreviousPlaylistPage: already at beginning");
+                this.LogDebug("Page: already at beginning");
                 return;
             }
 
             playlistGroupOffset = Math.Max(0, playlistGroupOffset - MaxPlaylistBridgeCount);
-            this.LogDebug("PreviousPlaylistPage: offset now {0}", playlistGroupOffset);
+            this.LogDebug("Page: previous (offset {0})", playlistGroupOffset);
             FirePlaylistNameFeedbacks();
             RelativeInputSelectFeedback.FireUpdate();
         }
@@ -819,8 +784,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             if (customJoins != null)
                 joinMap.SetCustomJoinData(customJoins);
 
-            this.LogDebug("Linking to Trilist {0}", trilist.ID.ToString("X"));
-            this.LogInformation("Linking to Bridge Type {0}", GetType().Name);
+            this.LogDebug("LinkToApi: IPID 0x{0}", trilist.ID.ToString("X"));
 
             // ── Digital: ToSIMPL (feedback) ──────────────────────────
             IsOnlineFeedback.LinkInputSig(trilist.BooleanInput[joinMap.IsOnline.JoinNumber]);
