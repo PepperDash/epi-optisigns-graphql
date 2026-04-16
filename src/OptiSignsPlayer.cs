@@ -20,6 +20,10 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
     ///   Power ON   ->  pushToScreens (restores last/default playlist, type: "NOW")
     ///   Input N    ->  pushToScreens (currentPlaylistId: id, type: "NOW")
     ///
+    /// Alternative methods using updateDevice mutation (AssignPlaylistAsset*):
+    ///   AssignPlaylistAsset* ->  updateDevice (currentType: "PLAYLIST", currentAssetId: id)
+    ///   Use these when pushToScreens doesn't properly switch from asset mode.
+    ///
     /// The player receives its GraphQL client and poll intervals from the parent server.
     /// Each player maintains its own state and is independently bridgeable.
     /// </summary>
@@ -271,17 +275,17 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     PowerIsOffFeedback.FireUpdate();
                 }
 
-                // Per API docs: currentAssetId is used for PLAYLIST/ASSET content (set via updateDevice).
-                // currentPlaylistId may be a legacy field. Use currentAssetId when currentType is PLAYLIST.
-                var isPlaylistType = string.Equals(node.CurrentType, "PLAYLIST", StringComparison.OrdinalIgnoreCase);
-                var effectivePlaylistId = isPlaylistType
-                    ? node.CurrentAssetId
-                    : node.CurrentPlaylistId;
+                // Determine effective playlist ID based on API response.
+                // pushToScreens sets currentPlaylistId, updateDevice sets currentAssetId.
+                // Prefer currentPlaylistId when available (non-null/non-empty), fall back to currentAssetId.
+                var effectivePlaylistId = !string.IsNullOrEmpty(node.CurrentPlaylistId)
+                    ? node.CurrentPlaylistId
+                    : node.CurrentAssetId;
 
                 this.LogVerbose(
-                    "[OptiSigns] Effective playlist calculation: isPlaylistType={0}, using {1}, effectiveId={2}",
-                    isPlaylistType,
-                    isPlaylistType ? "CurrentAssetId" : "CurrentPlaylistId",
+                    "[OptiSigns] Effective playlist calculation: CurrentPlaylistId={0}, CurrentAssetId={1}, effectiveId={2}",
+                    node.CurrentPlaylistId ?? "(null)",
+                    node.CurrentAssetId ?? "(null)",
                     effectivePlaylistId ?? "(null)");
 
                 // Track last known playlist for power-on restore
@@ -537,6 +541,101 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         }
 
         // ──────────────────────────────────────────────
+        // Assign Playlist Asset Methods
+        // ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Assigns a playlist as an asset using updateDevice mutation.
+        /// This sets currentType=PLAYLIST and currentAssetId, which properly
+        /// switches the device to playlist mode (instead of asset mode).
+        /// </summary>
+        public void AssignPlaylistAssetByIndex(int index)
+        {
+            if (index < 1 || index > playlists.Count)
+            {
+                this.LogWarning(
+                    "AssignPlaylistAssetByIndex: index {0} out of range (1-{1})",
+                    index, playlists.Count);
+                return;
+            }
+
+            var playlist = playlists[index - 1];
+            this.LogDebug("AssignPlaylistAssetByIndex({0}): '{1}' (id={2})",
+                index, playlist.Name, playlist.Id);
+            AssignPlaylistAssetById(playlist.Id);
+        }
+
+        /// <summary>
+        /// Assigns a playlist as an asset by its relative index on the current page.
+        /// </summary>
+        public void AssignPlaylistAssetByRelativeIndex(int relativeIndex)
+        {
+            if (relativeIndex < 1 || relativeIndex > MaxPlaylistBridgeCount)
+            {
+                this.LogWarning(
+                    "AssignPlaylistAssetByRelativeIndex: index {0} out of range (1-{1})",
+                    relativeIndex, MaxPlaylistBridgeCount);
+                return;
+            }
+
+            var absoluteIndex = playlistGroupOffset + relativeIndex;
+            AssignPlaylistAssetByIndex(absoluteIndex);
+        }
+
+        /// <summary>
+        /// Assigns a playlist as an asset by its ID using updateDevice mutation.
+        /// </summary>
+        public void AssignPlaylistAssetById(string playlistId)
+        {
+            if (string.IsNullOrEmpty(playlistId))
+            {
+                this.LogWarning("AssignPlaylistAssetById: playlistId is null or empty");
+                return;
+            }
+
+            this.LogInformation("AssignPlaylistAssetById: {0}", playlistId);
+
+            lastActivePlaylistId = playlistId;
+            ApplyOptimisticPlaylistState(playlistId, powerOn: true);
+            CrestronInvoke.BeginInvoke(_ => AssignPlaylistAssetByIdAsync(playlistId));
+        }
+
+        private async void AssignPlaylistAssetByIdAsync(string playlistId)
+        {
+            SetPolling(true);
+            try
+            {
+                // Use updateDevice mutation with currentType=PLAYLIST and currentAssetId
+                // This properly switches the device to playlist mode (not asset mode)
+                this.LogVerbose(
+                    "[OptiSigns] AssignPlaylistAssetByIdAsync (updateDevice): deviceId={0}, teamId={1}, playlistId={2}",
+                    playerConfig.DeviceId,
+                    playerConfig.TeamId,
+                    playlistId);
+
+                var success = await client.AssignPlaylistAsync(
+                    playerConfig.DeviceId,
+                    playerConfig.TeamId,
+                    playlistId).ConfigureAwait(false);
+
+                this.LogVerbose("[OptiSigns] AssignPlaylistAssetByIdAsync result: success={0}", success);
+
+                if (!success)
+                    this.LogWarning("AssignPlaylistAssetById: AssignPlaylistAsync returned false");
+
+                ScheduleConfirmationPoll();
+            }
+            catch (Exception ex)
+            {
+                this.LogError("Exception in AssignPlaylistAssetByIdAsync: {0}", ex.Message);
+            }
+            finally
+            {
+                SetPolling(false);
+            }
+        }
+
+        // ──────────────────────────────────────────────
         // Helpers
         // ──────────────────────────────────────────────
 
@@ -735,12 +834,18 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             trilist.SetSigTrueAction(joinMap.PreviousPage.JoinNumber, PreviousPlaylistPage);
             trilist.SetBoolSigAction(joinMap.PlaylistItemAsJsonObject.JoinNumber, SetPlaylistItemJsonFormat);
 
-            // ── Analog: ToFromSIMPL ───────────────────────────────────
+            // ── Analog: ToFromSIMPL (pushToScreens) ────────────────────
             AbsoluteInputSelectFeedback.LinkInputSig(trilist.UShortInput[joinMap.SelectPlaylistByAbsoluteIndex.JoinNumber]);
             trilist.SetUShortSigAction(joinMap.SelectPlaylistByAbsoluteIndex.JoinNumber, SelectPlaylistByAbsoluteIndex);
 
             RelativeInputSelectFeedback.LinkInputSig(trilist.UShortInput[joinMap.SelectPlaylistByRelativeIndex.JoinNumber]);
             trilist.SetUShortSigAction(joinMap.SelectPlaylistByRelativeIndex.JoinNumber, SelectPlaylistByRelativeIndex);
+
+            // ── Analog: FromSIMPL (updateDevice - asset mode) ─────────
+            trilist.SetUShortSigAction(joinMap.AssignPlaylistAssetByAbsoluteIndex.JoinNumber,
+                index => AssignPlaylistAssetByIndex((int)index));
+            trilist.SetUShortSigAction(joinMap.AssignPlaylistAssetByRelativeIndex.JoinNumber,
+                index => AssignPlaylistAssetByRelativeIndex((int)index));
 
             PlaylistCountFeedback.LinkInputSig(trilist.UShortInput[joinMap.PlaylistCount.JoinNumber]);
 
@@ -761,9 +866,13 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     trilist.StringInput[joinMap.PlaylistNames.JoinNumber + i]);
             }
 
-            // ── Serial: FromSIMPL (action) ────────────────────────────
+            // ── Serial: FromSIMPL (pushToScreens) ─────────────────────
             trilist.SetStringSigAction(joinMap.SelectPlaylistById.JoinNumber,
                 SelectPlaylistById);
+
+            // ── Serial: FromSIMPL (updateDevice - asset mode) ─────────
+            trilist.SetStringSigAction(joinMap.AssignPlaylistAssetById.JoinNumber,
+                AssignPlaylistAssetById);
 
             // ── Re-fire all feedback when the bridge (re)connects ─────
             trilist.OnlineStatusChange += (sender, args) =>
