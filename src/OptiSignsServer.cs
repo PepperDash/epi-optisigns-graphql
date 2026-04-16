@@ -110,7 +110,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     () => BuildDiscoveredDeviceJson(capturedI));
             }
 
-            this.LogDebug("OptiSignsServer created with {0} player(s) configured", 
+            this.LogDebug("Server created: {0} player(s)", 
                 props.Players?.Count ?? 0);
 
             // Create player devices in constructor so they exist before DeviceManager initialization
@@ -125,7 +125,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             if (_props.Players == null || _props.Players.Count == 0)
             {
-                this.LogWarning("No players configured for OptiSigns server '{0}'", Key);
+                this.LogWarning("No players configured");
                 return;
             }
 
@@ -133,19 +133,19 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             {
                 if (string.IsNullOrEmpty(playerConfig.Key))
                 {
-                    this.LogError("Player configuration missing 'key' property — skipping");
+                    this.LogError("Player missing 'key' — skipped");
                     continue;
                 }
 
                 if (string.IsNullOrEmpty(playerConfig.DeviceId))
                 {
-                    this.LogError("Player '{0}' missing 'deviceId' — skipping", playerConfig.Key);
+                    this.LogError("Player '{0}' missing 'deviceId' — skipped", playerConfig.Key);
                     continue;
                 }
 
                 if (string.IsNullOrEmpty(playerConfig.TeamId))
                 {
-                    this.LogError("Player '{0}' missing 'teamId' — skipping", playerConfig.Key);
+                    this.LogError("Player '{0}' missing 'teamId' — skipped", playerConfig.Key);
                     continue;
                 }
 
@@ -155,8 +155,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     ? playerConfig.Name 
                     : playerKey;
 
-                this.LogDebug("Creating player device: Key={0}, Name={1}, DeviceId={2}",
-                    playerKey, playerName, playerConfig.DeviceId);
+                this.LogVerbose("Creating player: {0} ({1})",
+                    playerKey, playerConfig.DeviceId);
 
                 var player = new OptiSignsPlayer(
                     playerKey,
@@ -172,10 +172,10 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 // Register with DeviceManager so the player can be bridged
                 DeviceManager.AddDevice(player);
 
-                this.LogInformation("Registered OptiSigns player: {0}", playerKey);
+                this.LogInformation("Player registered: {0}", playerKey);
             }
 
-            this.LogDebug("Created {0} player device(s)", _players.Count);
+            this.LogDebug("{0} player(s) created", _players.Count);
         }
 
         /// <summary>
@@ -186,7 +186,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             base.Initialize();
 
-            this.LogInformation("Initializing OptiSigns server: {0}", Key);
+            this.LogInformation("Initializing: {0}", Key);
 
             // Initialize all player devices (they were created and registered in constructor)
             foreach (var player in _players)
@@ -194,7 +194,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 player.Initialize();
             }
 
-            this.LogInformation("OptiSigns server initialized with {0} player(s)", _players.Count);
+            this.LogInformation("Initialized: {0} player(s)", _players.Count);
 
             // Fetch devices on startup to populate discovered devices list
             CrestronInvoke.BeginInvoke(_ => FetchDevicesAsync());
@@ -216,7 +216,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             if (_isFetching)
             {
-                this.LogDebug("FetchDevices: already fetching, ignoring request");
+                this.LogVerbose("FetchDevices: busy");
                 return;
             }
 
@@ -225,13 +225,13 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
             try
             {
-                this.LogDebug("Fetching all devices from OptiSigns API...");
+                this.LogDebug("Fetching devices...");
 
                 var devices = await _client.ListAllDevicesAsync().ConfigureAwait(false);
 
                 if (devices == null)
                 {
-                    this.LogWarning("FetchDevices: API returned null");
+                    this.LogWarning("FetchDevices: API null");
                     if (_isOnline)
                     {
                         _isOnline = false;
@@ -248,16 +248,15 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
                 _discoveredDevices = devices;
 
-                this.LogInformation("Discovered {0} device(s) from OptiSigns API", devices.Count);
+                this.LogInformation("Discovered {0} device(s)", devices.Count);
 
                 foreach (var device in devices)
                 {
                     this.LogVerbose(
-                        "[OptiSigns] Discovered device: Id={0}, Name={1}, Status={2}, UUID={3}",
+                        "Device: {0} ({1}) status={2}",
+                        device.DeviceName ?? "-",
                         device.Id,
-                        device.DeviceName ?? "(null)",
-                        device.Status ?? "(null)",
-                        device.UUID ?? "(null)");
+                        device.Status ?? "-");
                 }
 
                 DiscoveredDeviceCountFeedback.FireUpdate();
@@ -265,7 +264,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             }
             catch (Exception ex)
             {
-                this.LogError("Exception in FetchDevicesAsync: {0}", ex.Message);
+                this.LogError("FetchDevices failed: {0}", ex.Message);
             }
             finally
             {
@@ -291,7 +290,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             if (_isFetching)
             {
-                this.LogDebug("ExportPlaylists: already fetching, ignoring request");
+                this.LogVerbose("ExportPlaylists: busy");
                 return;
             }
 
@@ -300,19 +299,19 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
             try
             {
-                this.LogDebug("Fetching playlists for export...");
+                this.LogDebug("Exporting playlists...");
 
                 var playlists = await _client.GetPlaylistsAsync(_props.PlaylistLimit).ConfigureAwait(false);
 
                 if (playlists == null)
                 {
-                    this.LogWarning("ExportPlaylists: API returned null");
+                    this.LogWarning("ExportPlaylists: API null");
                     return;
                 }
 
                 if (playlists.Count == 0)
                 {
-                    this.LogWarning("ExportPlaylists: No playlists found");
+                    this.LogWarning("ExportPlaylists: empty");
                     return;
                 }
 
@@ -343,11 +342,11 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     writer.Write(json);
                 }
 
-                this.LogInformation("Exported {0} playlists to: {1}", playlists.Count, filePath);
+                this.LogInformation("Exported {0} playlists to {1}", playlists.Count, filePath);
             }
             catch (Exception ex)
             {
-                this.LogError("Exception in ExportPlaylistsToJsonAsync: {0}", ex.Message);
+                this.LogError("ExportPlaylists failed: {0}", ex.Message);
             }
             finally
             {
@@ -392,12 +391,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             if (_deviceGroupOffset == 0)
             {
-                this.LogDebug("FirstDevicePage: already at beginning");
+                this.LogVerbose("DevicePage: at start");
                 return;
             }
 
             _deviceGroupOffset = 0;
-            this.LogDebug("FirstDevicePage: offset now 0");
+            this.LogDebug("DevicePage: first");
             FireDiscoveredDeviceFeedbacks();
         }
 
@@ -408,12 +407,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             if (_deviceGroupOffset + MaxDiscoveredDeviceBridgeCount >= _discoveredDevices.Count)
             {
-                this.LogDebug("NextDevicePage: already at end");
+                this.LogVerbose("DevicePage: at end");
                 return;
             }
 
             _deviceGroupOffset += MaxDiscoveredDeviceBridgeCount;
-            this.LogDebug("NextDevicePage: offset now {0}", _deviceGroupOffset);
+            this.LogDebug("DevicePage: next (offset={0})", _deviceGroupOffset);
             FireDiscoveredDeviceFeedbacks();
         }
 
@@ -424,12 +423,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             if (_deviceGroupOffset <= 0)
             {
-                this.LogDebug("PreviousDevicePage: already at beginning");
+                this.LogVerbose("DevicePage: at start");
                 return;
             }
 
             _deviceGroupOffset = Math.Max(0, _deviceGroupOffset - MaxDiscoveredDeviceBridgeCount);
-            this.LogDebug("PreviousDevicePage: offset now {0}", _deviceGroupOffset);
+            this.LogDebug("DevicePage: prev (offset={0})", _deviceGroupOffset);
             FireDiscoveredDeviceFeedbacks();
         }
 
@@ -457,8 +456,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             if (customJoins != null)
                 joinMap.SetCustomJoinData(customJoins);
 
-            this.LogDebug("Linking server to Trilist {0}", trilist.ID.ToString("X"));
-            this.LogInformation("Linking to Bridge Type {0}", GetType().Name);
+            this.LogDebug("Bridge: IPID=0x{0}", trilist.ID.ToString("X"));
 
             // ── Digital: ToSIMPL (feedback) ──────────────────────────
             IsOnlineFeedback.LinkInputSig(trilist.BooleanInput[joinMap.IsOnline.JoinNumber]);

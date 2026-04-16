@@ -26,7 +26,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
     /// </summary>
     public class OptiSignsGraphQLClient : IKeyed
     {
-        private readonly string _separator = new string('-', 50);
         public string Key { get; private set; }
         private const string GraphQlEndpoint =
             "https://graphql-gateway.optisigns.com/graphql";
@@ -195,8 +194,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             // If there are more playlists than we fetched, re-fetch with the full count
             if (totalCount > fetchedCount)
             {
-                this.LogDebug("Playlist count {0} exceeds initial limit {1}, re-fetching all", 
-                    totalCount, limit);
+                this.LogDebug("Re-fetching playlists: {0} available, {1} fetched", 
+                    totalCount, fetchedCount);
 
                 variables = new PlaylistsQueryVariables { Limit = totalCount };
                 data = await ExecuteAsync<PlaylistsQueryData>(PlaylistsQuery, variables)
@@ -312,54 +311,16 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         // Private HTTP execution core
         // ──────────────────────────────────────────────        
 
-        private string MaskedApiKey
+        private void LogRequest(HttpMethod method, string body)
         {
-            get
-            {
-                return _apiKey != null && _apiKey.Length > 8
-                    ? _apiKey.Substring(0, 8) + "..."
-                    : "(empty)";
-            }
+            this.LogVerbose("GraphQL >> {0} {1} | Body: {2}", 
+                method, GraphQlEndpoint, body?.Trim());
         }
 
-        private void LogRequest(HttpMethod method = null, string body = null)
+        private void LogResponse(HttpMethod method, HttpResponseMessage httpResponse, string body)
         {
-            // this.LogVerbose(">>> Sending GraphQL Request\r\nmethod: {method}\r\nendpoint: {endpoint}\r\nheaders: Bearer {apiKey}\r\nrequestBody: {@requestBody}",
-            //     method, GraphQlEndpoint, MaskedApiKey, body);
-
-//             this.LogVerbose(@"\n
-// >>> Sending GraphQL Request\n
-// method: {method}\n
-// endpoint: {endpoint}\n
-// headers: Bearer {apiKey}\n
-// requestBody: {@requestBody}",
-//                 method, GraphQlEndpoint, MaskedApiKey, body);
-
-            this.LogVerbose(">>> Sending GraphQL Request");
-            this.LogVerbose("method: {method}", method);
-            this.LogVerbose("endpoint: {endpoint}", GraphQlEndpoint);
-            this.LogVerbose("headers: Bearer {apiKey}", MaskedApiKey);
-            this.LogVerbose("requestBody: {@requestBody}", body.Trim());
-        }
-
-        private void LogResponse(HttpMethod method = null, HttpResponseMessage httpResponse = null, string body = null)
-        {
-            // this.LogVerbose(">>> Received GraphQL Response\r\nmethod: {method}\r\nendpoint: {endpoint}\r\nstatus: {status} ({reasonPhrase})\r\nresponseBody: {@responseBody}",
-            //     method, GraphQlEndpoint, (int)httpResponse.StatusCode, httpResponse.ReasonPhrase, body);
-
-//             this.LogVerbose(@"\n
-// >>> Received GraphQL Response\n
-// method: {method}\n
-// endpoint: {endpoint}\n
-// status: {status} ({reasonPhrase})\n
-// responseBody: {@responseBody}",
-//                 method, GraphQlEndpoint, (int)httpResponse.StatusCode, httpResponse.ReasonPhrase, body);
-
-            this.LogVerbose(">>> Received GraphQL Response");
-            this.LogVerbose("method: {method}", method);
-            this.LogVerbose("endpoint: {endpoint}", GraphQlEndpoint);
-            this.LogVerbose("status: {status} ({reasonPhrase})", (int)httpResponse.StatusCode, httpResponse.ReasonPhrase);
-            this.LogVerbose("responseBody: {@responseBody}", body.Trim());
+            this.LogVerbose("GraphQL << {0} {1} | Body: {2}", 
+                (int)httpResponse.StatusCode, httpResponse.ReasonPhrase, body?.Trim());
         }
 
         private void LogGraphQlError(GraphQlError error, string requestBody, string responseBody)
@@ -367,14 +328,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             var errorCode = error.Extensions?.Code ?? "UNKNOWN";
             var errorPath = error.Path != null ? string.Join(".", error.Path) : "(root)";
 
-            this.LogError(">>> GraphQL Error");
-            this.LogError("code: {code}", errorCode);
-            this.LogError("message: {message}", error.Message);
-            this.LogError("path: {path}", errorPath);
-            this.LogError("endpoint: {endpoint}", GraphQlEndpoint);
-            this.LogError("apiKey: {apiKey}", MaskedApiKey);
-            this.LogVerbose("requestBody: {@requestBody}", requestBody.Trim());
-            this.LogVerbose("responseBody: {@responseBody}", responseBody.Trim());
+            this.LogError("GraphQL error [{0}] at {1}: {2}", errorCode, errorPath, error.Message);
+            this.LogVerbose("Request: {0}", requestBody?.Trim());
+            this.LogVerbose("Response: {0}", responseBody?.Trim());
         }
 
         /// <summary>
@@ -415,7 +371,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
                 if (!httpResponse.IsSuccessStatusCode)
                 {
-                    this.LogError("HTTP {0}: {1}", (int)httpResponse.StatusCode, responseBody);
+                    this.LogError("HTTP {0} {1}", (int)httpResponse.StatusCode, httpResponse.ReasonPhrase);
                     return null;
                 }
 
@@ -432,13 +388,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             }
             catch (TaskCanceledException)
             {
-                this.LogError("Request timed out");
+                this.LogError("GraphQL request timed out");
                 return null;
             }
             catch (Exception ex)
             {
-                this.LogError(ex, "Exception during GraphQL request");
-                this.LogError("HTTP exception: {0}", ex.Message);
+                this.LogError("GraphQL request failed: {0}", ex.Message);
                 return null;
             }
         }
