@@ -164,8 +164,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     playerConfig,
                     _client,
                     _props.PollIntervalMs,
-                    _props.PlaylistPollIntervalMs,
-                    _props.PlaylistLimit);
+                    _props.PlaylistPollIntervalMs);
 
                 _players.Add(player);
 
@@ -301,7 +300,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             {
                 this.LogDebug("Exporting playlists...");
 
-                var playlists = await _client.GetPlaylistsAsync(_props.PlaylistLimit).ConfigureAwait(false);
+                var playlists = await _client.GetPlaylistsAsync().ConfigureAwait(false);
 
                 if (playlists == null)
                 {

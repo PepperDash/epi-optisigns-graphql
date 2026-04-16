@@ -137,6 +137,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
     // query {
     //   playlists(query: {}) { page { edges { node { ... } } } }
     // }
+    // NOTE: API does not support limit/totalCount pagination.
     // ──────────────────────────────────────────────
 
     internal class PlaylistsQueryData
@@ -145,17 +146,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         public PlaylistsConnection Playlists { get; set; }
     }
 
-    internal class PlaylistsQueryVariables
-    {
-        [JsonProperty("limit")]
-        public int? Limit { get; set; }
-    }
-
     internal class PlaylistsConnection
     {
-        [JsonProperty("totalCount")]
-        public int TotalCount { get; set; }
-
         [JsonProperty("page")]
         public PlaylistsPage Page { get; set; }
     }
