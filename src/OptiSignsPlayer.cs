@@ -239,10 +239,15 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
                 consecutiveFailures = 0;
 
-                this.LogVerbose("Poll: type={0} playlist={1} asset={2}",
-                    node.CurrentType ?? "-",
-                    node.CurrentPlaylistId ?? "-",
-                    node.CurrentAssetId ?? "-");
+                // Only log poll details at Verbose when values actually change
+                if (node.CurrentType != currentType ||
+                    node.CurrentPlaylistId != currentPlaylistId)
+                {
+                    this.LogVerbose("Poll: type={0} playlist={1} asset={2}",
+                        node.CurrentType ?? "-",
+                        node.CurrentPlaylistId ?? "-",
+                        node.CurrentAssetId ?? "-");
+                }
 
                 if (!isOnline)
                 {
@@ -271,10 +276,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     ? node.CurrentPlaylistId
                     : node.CurrentAssetId;
 
-                this.LogVerbose("Effective playlist: {0} (playlistId={1}, assetId={2})",
-                    effectivePlaylistId ?? "-",
-                    node.CurrentPlaylistId ?? "-",
-                    node.CurrentAssetId ?? "-");
+
 
                 // Track last known playlist for power-on restore
                 if (powerIsOn && !string.IsNullOrEmpty(effectivePlaylistId))
@@ -350,13 +352,17 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 }
 
                 // Atomic reference swap — safe on CLR without a lock.
+                var changed = playlists.Count != apiPlaylists.Count ||
+                    !playlists.Select(p => p.Id).SequenceEqual(apiPlaylists.Select(p => p.Id));
                 playlists = apiPlaylists;
-                this.LogDebug("Playlists: {0} items", playlists.Count);
 
-                // Log playlist names at verbose level for debugging
-                var playlistSummary = string.Join(", ", playlists.Select((p, i) =>
-                    string.Format("[{0}] {1}", i + 1, p.Name)));
-                this.LogVerbose("Playlists: {0}", playlistSummary);
+                if (changed)
+                {
+                    this.LogDebug("Playlists updated: {0} items", playlists.Count);
+                    var playlistSummary = string.Join(", ", playlists.Select((p, i) =>
+                        string.Format("[{0}] {1}", i + 1, p.Name)));
+                    this.LogVerbose("Playlists: {0}", playlistSummary);
+                }
 
                 var newIndex = ResolvePlaylistIndex(currentPlaylistId);
                 if (newIndex != currentPlaylistIndex)

@@ -274,14 +274,14 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         private void LogRequest(HttpMethod method, string body)
         {
-            this.LogVerbose("GraphQL >> {0} {1} | Body: {2}", 
-                method, GraphQlEndpoint, body?.Trim());
+            this.LogVerbose("GraphQL >> {0} {1} ({2} chars)", 
+                method, GraphQlEndpoint, body?.Length ?? 0);
         }
 
         private void LogResponse(HttpMethod method, HttpResponseMessage httpResponse, string body)
         {
-            this.LogVerbose("GraphQL << {0} {1} | Body: {2}", 
-                (int)httpResponse.StatusCode, httpResponse.ReasonPhrase, body?.Trim());
+            this.LogVerbose("GraphQL << {0} {1} ({2} chars)", 
+                (int)httpResponse.StatusCode, httpResponse.ReasonPhrase, body?.Length ?? 0);
         }
 
         private void LogGraphQlError(GraphQlError error, string requestBody, string responseBody)
