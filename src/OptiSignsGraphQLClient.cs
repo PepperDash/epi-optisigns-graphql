@@ -137,10 +137,10 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// Fetches the current status of the configured device.
         /// Returns null on any error (network, API error, empty result).
         /// </summary>
-        public async Task<DeviceNode> GetDeviceStatusAsync(string deviceId)
+        public async Task<DeviceNode> GetDeviceStatusAsync(string deviceId, string caller = null)
         {
             var variables = new { id = deviceId };
-            var data = await ExecuteAsync<DevicesQueryData>(DeviceStatusQuery, variables)
+            var data = await ExecuteAsync<DevicesQueryData>(DeviceStatusQuery, variables, caller, "GetDeviceStatus")
                 .ConfigureAwait(false);
 
             if (data?.Devices?.Page?.Edges == null || data.Devices.Page.Edges.Count == 0)
@@ -153,9 +153,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// Fetches all devices (players/screens) available in the OptiSigns account.
         /// Returns null on any error (network, API error).
         /// </summary>
-        public async Task<List<DeviceNode>> ListAllDevicesAsync()
+        public async Task<List<DeviceNode>> ListAllDevicesAsync(string caller = null)
         {
-            var data = await ExecuteAsync<DevicesQueryData>(ListAllDevicesQuery, null)
+            var data = await ExecuteAsync<DevicesQueryData>(ListAllDevicesQuery, null, caller, "ListAllDevices")
                 .ConfigureAwait(false);
 
             if (data?.Devices?.Page?.Edges == null)
@@ -175,9 +175,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// Returns null if the endpoint is unavailable or returns an error.
         /// The caller should fall back to the config-provided list when null is returned.
         /// </summary>
-        public async Task<List<PlaylistNode>> GetPlaylistsAsync()
+        public async Task<List<PlaylistNode>> GetPlaylistsAsync(string caller = null)
         {
-            var data = await ExecuteAsync<PlaylistsQueryData>(PlaylistsQuery, null)
+            var data = await ExecuteAsync<PlaylistsQueryData>(PlaylistsQuery, null, caller, "GetPlaylists")
                 .ConfigureAwait(false);
 
             if (data?.Playlists?.Page?.Edges == null)
@@ -200,7 +200,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         public async Task<bool> UpdateDeviceAsync(
             string deviceId,
             string teamId,
-            UpdateDeviceInput payload)
+            UpdateDeviceInput payload,
+            string caller = null)
         {
             var variables = new UpdateDeviceVariables
             {
@@ -209,7 +210,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 Payload = payload
             };
 
-            var data = await ExecuteAsync<UpdateDeviceMutationData>(UpdateDeviceMutation, variables)
+            var data = await ExecuteAsync<UpdateDeviceMutationData>(UpdateDeviceMutation, variables, caller, "UpdateDevice")
                 .ConfigureAwait(false);
 
             return !string.IsNullOrEmpty(data?.UpdateDevice?.Id);
@@ -223,7 +224,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         public async Task<bool> AssignPlaylistAsync(
             string deviceId,
             string teamId,
-            string playlistId)
+            string playlistId,
+            string caller = null)
         {
             var payload = new UpdateDeviceInput
             {
@@ -231,7 +233,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 CurrentAssetId = playlistId
             };
 
-            return await UpdateDeviceAsync(deviceId, teamId, payload).ConfigureAwait(false);
+            return await UpdateDeviceAsync(deviceId, teamId, payload, caller).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -243,7 +245,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         public async Task<bool> PushToScreensAsync(
             string teamId,
             PushToScreensInput payload,
-            bool force = false)
+            bool force = false,
+            string caller = null)
         {
             var variables = new PushToScreensVariables
             {
@@ -252,7 +255,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 Force = force
             };
 
-            var data = await ExecuteAsync<PushToScreensMutationData>(PushToScreensMutation, variables)
+            var data = await ExecuteAsync<PushToScreensMutationData>(PushToScreensMutation, variables, caller, "PushToScreens")
                 .ConfigureAwait(false);
 
             // JSONObject! returns a JObject - check if it has a status field
@@ -272,16 +275,16 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         // Private HTTP execution core
         // ──────────────────────────────────────────────        
 
-        private void LogRequest(HttpMethod method, string body)
+        private void LogRequest(string caller, string operation, int bodyLength)
         {
-            this.LogVerbose("GraphQL >> {0} {1} ({2} chars)", 
-                method, GraphQlEndpoint, body?.Length ?? 0);
+            this.LogVerbose("{0} >> {1} ({2} chars)", 
+                caller ?? "?", operation ?? "?", bodyLength);
         }
 
-        private void LogResponse(HttpMethod method, HttpResponseMessage httpResponse, string body)
+        private void LogResponse(string caller, string operation, HttpResponseMessage httpResponse, int bodyLength)
         {
-            this.LogVerbose("GraphQL << {0} {1} ({2} chars)", 
-                (int)httpResponse.StatusCode, httpResponse.ReasonPhrase, body?.Length ?? 0);
+            this.LogVerbose("{0} << {1} {2} ({3} chars)", 
+                caller ?? "?", operation ?? "?", (int)httpResponse.StatusCode, bodyLength);
         }
 
         private void LogGraphQlError(GraphQlError error, string requestBody, string responseBody)
@@ -301,7 +304,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// ConfigureAwait(false) throughout to avoid deadlocks on Crestron's
         /// synchronization context.
         /// </summary>
-        private async Task<T> ExecuteAsync<T>(string query, object variables)
+        private async Task<T> ExecuteAsync<T>(string query, object variables, string caller, string operation)
             where T : class
         {
             try
@@ -314,7 +317,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
                 var requestBodyJson = JsonConvert.SerializeObject(requestBody);
                 
-                LogRequest(HttpMethod.Post, requestBodyJson);
+                LogRequest(caller, operation, requestBodyJson?.Length ?? 0);
                 
                 var content = new StringContent(requestBodyJson, Encoding.UTF8, "application/json");
 
@@ -328,7 +331,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 var httpResponse = await HttpClient.SendAsync(request).ConfigureAwait(false);
                 var responseBody = await httpResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
 
-                LogResponse(HttpMethod.Post, httpResponse, responseBody);
+                LogResponse(caller, operation, httpResponse, responseBody?.Length ?? 0);
 
                 if (!httpResponse.IsSuccessStatusCode)
                 {

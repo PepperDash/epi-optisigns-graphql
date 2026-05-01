@@ -219,7 +219,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             SetPolling(true);
             try
             {
-                var node = await client.GetDeviceStatusAsync(playerConfig.DeviceId)
+                var node = await client.GetDeviceStatusAsync(playerConfig.DeviceId, Key)
                     .ConfigureAwait(false);
 
                 if (node == null)
@@ -335,7 +335,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             try
             {
-                var apiPlaylists = await client.GetPlaylistsAsync().ConfigureAwait(false);
+                var apiPlaylists = await client.GetPlaylistsAsync(Key).ConfigureAwait(false);
 
                 if (apiPlaylists == null)
                 {
@@ -495,7 +495,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
                 this.LogVerbose("pushToScreens: {0}", playlistId);
 
-                var success = await client.PushToScreensAsync(playerConfig.TeamId, payload)
+                var success = await client.PushToScreensAsync(playerConfig.TeamId, payload, false, Key)
                     .ConfigureAwait(false);
 
                 if (!success)
@@ -586,7 +586,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 var success = await client.AssignPlaylistAsync(
                     playerConfig.DeviceId,
                     playerConfig.TeamId,
-                    playlistId).ConfigureAwait(false);
+                    playlistId,
+                    Key).ConfigureAwait(false);
 
                 if (!success)
                     this.LogWarning("updateDevice failed");

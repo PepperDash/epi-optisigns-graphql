@@ -226,7 +226,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             {
                 this.LogDebug("Fetching devices...");
 
-                var devices = await _client.ListAllDevicesAsync().ConfigureAwait(false);
+                var devices = await _client.ListAllDevicesAsync(Key).ConfigureAwait(false);
 
                 if (devices == null)
                 {
@@ -300,7 +300,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             {
                 this.LogDebug("Exporting playlists...");
 
-                var playlists = await _client.GetPlaylistsAsync().ConfigureAwait(false);
+                var playlists = await _client.GetPlaylistsAsync(Key).ConfigureAwait(false);
 
                 if (playlists == null)
                 {
