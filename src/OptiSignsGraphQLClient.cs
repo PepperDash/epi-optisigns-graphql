@@ -251,7 +251,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             string teamId,
             PushToScreensInput payload,
             bool force = false,
-            string caller = null)
+            string caller = null,
+            string playlistName = null)
         {
             var variables = new PushToScreensVariables
             {
@@ -263,9 +264,18 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             var deviceIds = payload.DeviceIds != null && payload.DeviceIds.Count > 0
                 ? string.Join(",", payload.DeviceIds)
                 : "?";
-            var info = !string.IsNullOrEmpty(payload.CurrentPlaylistId)
-                ? string.Format("{0} playlist={1}", deviceIds, payload.CurrentPlaylistId)
-                : deviceIds;
+            string info;
+            if (!string.IsNullOrEmpty(payload.CurrentPlaylistId))
+            {
+                var displayName = !string.IsNullOrEmpty(playlistName) 
+                    ? string.Format("{0} ({1})", playlistName, payload.CurrentPlaylistId)
+                    : payload.CurrentPlaylistId;
+                info = string.Format("{0} playlist={1}", deviceIds, displayName);
+            }
+            else
+            {
+                info = deviceIds;
+            }
 
             var data = await ExecuteAsync<PushToScreensMutationData>(PushToScreensMutation, variables, caller, "PushToScreens", info)
                 .ConfigureAwait(false);

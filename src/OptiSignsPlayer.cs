@@ -493,7 +493,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     Type = "NOW"
                 };
 
-                var success = await client.PushToScreensAsync(playerConfig.TeamId, payload, false, Key)
+                var playlistName = ResolvePlaylistName(playlistId);
+                var success = await client.PushToScreensAsync(playerConfig.TeamId, payload, false, Key, playlistName)
                     .ConfigureAwait(false);
 
                 if (!success)
