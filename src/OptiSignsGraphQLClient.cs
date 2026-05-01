@@ -140,7 +140,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         public async Task<DeviceNode> GetDeviceStatusAsync(string deviceId, string caller = null)
         {
             var variables = new { id = deviceId };
-            var data = await ExecuteAsync<DevicesQueryData>(DeviceStatusQuery, variables, caller, "GetDeviceStatus")
+            var data = await ExecuteAsync<DevicesQueryData>(DeviceStatusQuery, variables, caller, "GetDeviceStatus", deviceId)
                 .ConfigureAwait(false);
 
             if (data?.Devices?.Page?.Edges == null || data.Devices.Page.Edges.Count == 0)
@@ -201,7 +201,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             string deviceId,
             string teamId,
             UpdateDeviceInput payload,
-            string caller = null)
+            string caller = null,
+            string playlistId = null)
         {
             var variables = new UpdateDeviceVariables
             {
@@ -210,7 +211,11 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 Payload = payload
             };
 
-            var data = await ExecuteAsync<UpdateDeviceMutationData>(UpdateDeviceMutation, variables, caller, "UpdateDevice")
+            var info = !string.IsNullOrEmpty(playlistId) 
+                ? string.Format("{0} playlist={1}", deviceId, playlistId)
+                : deviceId;
+
+            var data = await ExecuteAsync<UpdateDeviceMutationData>(UpdateDeviceMutation, variables, caller, "UpdateDevice", info)
                 .ConfigureAwait(false);
 
             return !string.IsNullOrEmpty(data?.UpdateDevice?.Id);
@@ -233,7 +238,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 CurrentAssetId = playlistId
             };
 
-            return await UpdateDeviceAsync(deviceId, teamId, payload, caller).ConfigureAwait(false);
+            return await UpdateDeviceAsync(deviceId, teamId, payload, caller, playlistId).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -255,7 +260,14 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 Force = force
             };
 
-            var data = await ExecuteAsync<PushToScreensMutationData>(PushToScreensMutation, variables, caller, "PushToScreens")
+            var deviceIds = payload.DeviceIds != null && payload.DeviceIds.Count > 0
+                ? string.Join(",", payload.DeviceIds)
+                : "?";
+            var info = !string.IsNullOrEmpty(payload.CurrentPlaylistId)
+                ? string.Format("{0} playlist={1}", deviceIds, payload.CurrentPlaylistId)
+                : deviceIds;
+
+            var data = await ExecuteAsync<PushToScreensMutationData>(PushToScreensMutation, variables, caller, "PushToScreens", info)
                 .ConfigureAwait(false);
 
             // JSONObject! returns a JObject - check if it has a status field
@@ -275,16 +287,24 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         // Private HTTP execution core
         // ──────────────────────────────────────────────        
 
-        private void LogRequest(string caller, string operation, int bodyLength)
+        private void LogRequest(string caller, string operation, string info, int bodyLength)
         {
-            this.LogVerbose("{0} >> {1} ({2} chars)", 
-                caller ?? "?", operation ?? "?", bodyLength);
+            if (string.IsNullOrEmpty(info))
+                this.LogVerbose("{0} >> {1} ({2} chars)", 
+                    caller ?? "?", operation ?? "?", bodyLength);
+            else
+                this.LogVerbose("{0} >> {1} [{2}] ({3} chars)", 
+                    caller ?? "?", operation ?? "?", info, bodyLength);
         }
 
-        private void LogResponse(string caller, string operation, HttpResponseMessage httpResponse, int bodyLength)
+        private void LogResponse(string caller, string operation, string info, HttpResponseMessage httpResponse, int bodyLength)
         {
-            this.LogVerbose("{0} << {1} {2} ({3} chars)", 
-                caller ?? "?", operation ?? "?", (int)httpResponse.StatusCode, bodyLength);
+            if (string.IsNullOrEmpty(info))
+                this.LogVerbose("{0} << {1} {2} ({3} chars)", 
+                    caller ?? "?", operation ?? "?", (int)httpResponse.StatusCode, bodyLength);
+            else
+                this.LogVerbose("{0} << {1} [{2}] {3} ({4} chars)", 
+                    caller ?? "?", operation ?? "?", info, (int)httpResponse.StatusCode, bodyLength);
         }
 
         private void LogGraphQlError(GraphQlError error, string requestBody, string responseBody)
@@ -304,7 +324,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// ConfigureAwait(false) throughout to avoid deadlocks on Crestron's
         /// synchronization context.
         /// </summary>
-        private async Task<T> ExecuteAsync<T>(string query, object variables, string caller, string operation)
+        private async Task<T> ExecuteAsync<T>(string query, object variables, string caller, string operation, string info = null)
             where T : class
         {
             try
@@ -317,7 +337,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
                 var requestBodyJson = JsonConvert.SerializeObject(requestBody);
                 
-                LogRequest(caller, operation, requestBodyJson?.Length ?? 0);
+                LogRequest(caller, operation, info, requestBodyJson?.Length ?? 0);
                 
                 var content = new StringContent(requestBodyJson, Encoding.UTF8, "application/json");
 
@@ -331,7 +351,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 var httpResponse = await HttpClient.SendAsync(request).ConfigureAwait(false);
                 var responseBody = await httpResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
 
-                LogResponse(caller, operation, httpResponse, responseBody?.Length ?? 0);
+                LogResponse(caller, operation, info, httpResponse, responseBody?.Length ?? 0);
 
                 if (!httpResponse.IsSuccessStatusCode)
                 {

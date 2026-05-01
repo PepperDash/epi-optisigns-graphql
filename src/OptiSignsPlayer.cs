@@ -493,8 +493,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     Type = "NOW"
                 };
 
-                this.LogVerbose("pushToScreens: {0}", playlistId);
-
                 var success = await client.PushToScreensAsync(playerConfig.TeamId, payload, false, Key)
                     .ConfigureAwait(false);
 
@@ -581,8 +579,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             {
                 // Use updateDevice mutation with currentType=PLAYLIST and currentAssetId
                 // This properly switches the device to playlist mode (not asset mode)
-                this.LogVerbose("updateDevice: {0}", playlistId);
-
                 var success = await client.AssignPlaylistAsync(
                     playerConfig.DeviceId,
                     playerConfig.TeamId,
