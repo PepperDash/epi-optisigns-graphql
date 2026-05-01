@@ -357,12 +357,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 playlists = apiPlaylists;
 
                 if (changed)
-                {
                     this.LogDebug("Playlists updated: {0} items", playlists.Count);
-                    var playlistSummary = string.Join(", ", playlists.Select((p, i) =>
-                        string.Format("[{0}] {1}", i + 1, p.Name)));
-                    this.LogVerbose("Playlists: {0}", playlistSummary);
-                }
 
                 var newIndex = ResolvePlaylistIndex(currentPlaylistId);
                 if (newIndex != currentPlaylistIndex)
