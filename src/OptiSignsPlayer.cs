@@ -33,6 +33,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         private readonly OptiSignsGraphQLClient client;
         private readonly int pollIntervalMs;
         private readonly int playlistPollIntervalMs;
+        private readonly int playlistLimit;
 
         // ──────────────────────────────────────────────
         // Internal state
@@ -69,6 +70,8 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         private CTimer statusPollTimer;
         private CTimer playlistPollTimer;
+        private CTimer _confirmationPollTimer;
+        private bool isPlaylistPolling;
 
         // ──────────────────────────────────────────────
         // Feedbacks
@@ -101,24 +104,27 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// <param name="client">Shared GraphQL client from the parent server</param>
         /// <param name="pollIntervalMs">Status poll interval in milliseconds</param>
         /// <param name="playlistPollIntervalMs">Playlist poll interval in milliseconds</param>
+        /// <param name="playlistLimit">Maximum playlists to fetch per request (0 = server default)</param>
         public OptiSignsPlayer(
             string key,
             string name,
             OptiSignsPlayerConfig playerConfig,
             OptiSignsGraphQLClient client,
             int pollIntervalMs,
-            int playlistPollIntervalMs)
+            int playlistPollIntervalMs,
+            int playlistLimit = 100)
             : base(key, name)
         {
 			this.playerConfig = playerConfig;
 			this.client = client;
 			this.pollIntervalMs = pollIntervalMs;
 			this.playlistPollIntervalMs = playlistPollIntervalMs;
+			this.playlistLimit = playlistLimit;
             // Seed from static config so labels are available before the first API poll.
             if (this.playerConfig.Playlists != null && this.playerConfig.Playlists.Count > 0)
             {
 				playlists = this.playerConfig.Playlists
-                    .Select(p => new PlaylistNode { Id = p.Id, Name = p.Name })
+                    .Select(p => new PlaylistNode { Id = p.Id, Name = p.Name, Type = p.Type })
                     .ToList();
             }
 
@@ -216,6 +222,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         private async void PollDeviceStatusAsync()
         {
+            if (isPolling) return;
             SetPolling(true);
             try
             {
@@ -284,12 +291,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
                 if (effectivePlaylistId != currentPlaylistId)
                 {
-                    this.LogDebug("Playlist changed: '{0}' [idx={1}]",
-                        ResolvePlaylistName(effectivePlaylistId),
-                        ResolvePlaylistIndex(effectivePlaylistId));
+                    int newIdx;
+                    var newName = ResolvePlaylistInfo(effectivePlaylistId, out newIdx);
+                    this.LogDebug("Playlist changed: '{0}' [idx={1}]", newName, newIdx);
                     currentPlaylistId = effectivePlaylistId;
-                    currentPlaylistName = ResolvePlaylistName(currentPlaylistId);
-                    currentPlaylistIndex = ResolvePlaylistIndex(currentPlaylistId);
+                    currentPlaylistName = newName;
+                    currentPlaylistIndex = newIdx;
                     CurrentPlaylistNameFeedback.FireUpdate();
                     AbsoluteInputSelectFeedback.FireUpdate();
                     RelativeInputSelectFeedback.FireUpdate();
@@ -333,9 +340,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         private async void PollPlaylistsAsync()
         {
+            if (isPlaylistPolling) return;
+            isPlaylistPolling = true;
             try
             {
-                var apiPlaylists = await client.GetPlaylistsAsync(Key).ConfigureAwait(false);
+                var apiPlaylists = await client.GetPlaylistsAsync(playerConfig.TeamId, playlistLimit, Key)
+                    .ConfigureAwait(false);
 
                 if (apiPlaylists == null)
                 {
@@ -379,6 +389,10 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             catch (Exception ex)
             {
                 this.LogError("Playlist poll failed: {0}", ex.Message);
+            }
+            finally
+            {
+                isPlaylistPolling = false;
             }
         }
 
@@ -475,7 +489,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             this.LogInformation("Select: {0}", playlistId);
 
             lastActivePlaylistId = playlistId;
-            ApplyOptimisticPlaylistState(playlistId, powerOn: true);
+            ApplyOptimisticPlaylistState(playlistId);
             CrestronInvoke.BeginInvoke(_ => SelectPlaylistByIdAsync(playlistId));
         }
 
@@ -485,22 +499,35 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             SetPlaylistSelectionBusy(true);
             try
             {
-                // Use pushToScreens mutation with type "NOW" to immediately display playlist
-                var payload = new PushToScreensInput
+                var contentType = playlists.Find(p => p.Id == playlistId)?.Type;
+                bool success;
+
+                if (string.Equals(contentType, "ASSET", StringComparison.OrdinalIgnoreCase))
                 {
-                    DeviceIds = new List<string> { playerConfig.DeviceId },
-                    CurrentPlaylistId = playlistId,
-                    Type = "NOW"
-                };
+                    success = await client.AssignContentAsync(
+                        playerConfig.DeviceId, playerConfig.TeamId, playlistId, "ASSET", Key)
+                        .ConfigureAwait(false);
 
-                var playlistName = ResolvePlaylistName(playlistId);
-                var success = await client.PushToScreensAsync(playerConfig.TeamId, payload, false, Key, playlistName)
-                    .ConfigureAwait(false);
-
-                if (!success)
-                    this.LogWarning("pushToScreens failed");
+                    if (!success) this.LogWarning("assignContent(ASSET) failed");
+                    else this.LogDebug("assignContent(ASSET) OK");
+                }
                 else
-                    this.LogDebug("pushToScreens OK");
+                {
+                    // Default: PLAYLIST via pushToScreens
+                    var payload = new PushToScreensInput
+                    {
+                        DeviceIds = new List<string> { playerConfig.DeviceId },
+                        CurrentPlaylistId = playlistId,
+                        Type = "NOW"
+                    };
+
+                    var playlistName = ResolvePlaylistName(playlistId);
+                    success = await client.PushToScreensAsync(playerConfig.TeamId, payload, false, Key, playlistName)
+                        .ConfigureAwait(false);
+
+                    if (!success) this.LogWarning("pushToScreens failed");
+                    else this.LogDebug("pushToScreens OK");
+                }
 
                 ScheduleConfirmationPoll();
             }
@@ -568,7 +595,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             this.LogInformation("Assign: {0}", playlistId);
 
             lastActivePlaylistId = playlistId;
-            ApplyOptimisticPlaylistState(playlistId, powerOn: true);
+            ApplyOptimisticPlaylistState(playlistId);
             CrestronInvoke.BeginInvoke(_ => AssignPlaylistAssetByIdAsync(playlistId));
         }
 
@@ -608,18 +635,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         // Helpers
         // ──────────────────────────────────────────────
 
-        private void ApplyOptimisticPlaylistState(string playlistId, bool powerOn)
+        private void ApplyOptimisticPlaylistState(string playlistId)
         {
-            // if (powerOn != _powerIsOn)
-            // {
-            //     _powerIsOn = powerOn;
-            //     PowerIsOnFeedback.FireUpdate();
-            //     PowerIsOffFeedback.FireUpdate();
-            // }
-
             currentPlaylistId = playlistId;
-            currentPlaylistName = ResolvePlaylistName(playlistId);
-            currentPlaylistIndex = ResolvePlaylistIndex(playlistId);
+            int resolvedIndex;
+            currentPlaylistName = ResolvePlaylistInfo(playlistId, out resolvedIndex);
+            currentPlaylistIndex = resolvedIndex;
             CurrentPlaylistNameFeedback.FireUpdate();
             AbsoluteInputSelectFeedback.FireUpdate();
             RelativeInputSelectFeedback.FireUpdate();
@@ -627,14 +648,19 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         private void ScheduleConfirmationPoll()
         {
-            new CTimer(_ => CrestronInvoke.BeginInvoke(__ => PollDeviceStatusAsync()), 2000);
+            _confirmationPollTimer?.Dispose();
+            _confirmationPollTimer = new CTimer(_ => CrestronInvoke.BeginInvoke(__ => PollDeviceStatusAsync()), 2000);
         }
 
         private string ResolvePlaylistName(string id)
         {
             if (string.IsNullOrEmpty(id)) return string.Empty;
-            var match = playlists.FirstOrDefault(p => p.Id == id);
-            return match != null ? match.Name ?? id : id;
+            for (var i = 0; i < playlists.Count; i++)
+            {
+                if (playlists[i].Id == id)
+                    return playlists[i].Name ?? id;
+            }
+            return id;
         }
 
         private int ResolvePlaylistIndex(string id)
@@ -646,6 +672,25 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                     return i + 1;
             }
             return 0;
+        }
+
+        /// <summary>
+        /// Single-pass lookup returning both name and 1-based index for a playlist ID.
+        /// Avoids scanning the list twice when both values are needed.
+        /// </summary>
+        private string ResolvePlaylistInfo(string id, out int index)
+        {
+            index = 0;
+            if (string.IsNullOrEmpty(id)) return string.Empty;
+            for (var i = 0; i < playlists.Count; i++)
+            {
+                if (playlists[i].Id == id)
+                {
+                    index = i + 1;
+                    return playlists[i].Name ?? id;
+                }
+            }
+            return id;
         }
 
         /// <summary>
@@ -827,7 +872,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             PlaylistCountFeedback.LinkInputSig(trilist.UShortInput[joinMap.PlaylistCount.JoinNumber]);
 
             // ── Serial: ToSIMPL (feedback) ────────────────────────────
-            trilist.SetString(joinMap.DeviceName.JoinNumber, Name);
+            DeviceNameFeedback.LinkInputSig(trilist.StringInput[joinMap.DeviceName.JoinNumber]);
             CurrentPlaylistNameFeedback.LinkInputSig(
                 trilist.StringInput[joinMap.CurrentPlaylistName.JoinNumber]);
 
@@ -856,7 +901,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             {
                 if (!args.DeviceOnLine) return;
 
-                trilist.SetString(joinMap.DeviceName.JoinNumber, Name);
                 FireAllFeedbacks();
             };
         }

@@ -177,6 +177,22 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         [JsonProperty("tags")]
         public List<string> Tags { get; set; }
+
+        /// <summary>
+        /// Content type: "ASSET" or "PLAYLIST". Not returned by the API — set
+        /// programmatically when seeding from config. Null for API-fetched items
+        /// (treated as "PLAYLIST" at selection time).
+        /// </summary>
+        public string Type { get; set; }
+    }
+
+    internal class PlaylistsVariables
+    {
+        [JsonProperty("teamId", NullValueHandling = NullValueHandling.Ignore)]
+        public string TeamId { get; set; }
+
+        [JsonProperty("limit", NullValueHandling = NullValueHandling.Ignore)]
+        public int? Limit { get; set; }
     }
 
     // ──────────────────────────────────────────────

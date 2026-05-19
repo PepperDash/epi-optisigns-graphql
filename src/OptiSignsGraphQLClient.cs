@@ -87,10 +87,9 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         // NOTE: The playlists query is not in the official TypeScript SDK (Phase 2).
         // We attempt it directly. GetPlaylistsAsync returns null if the endpoint
         // is not yet live — the caller falls back to the config-provided list.
-        // The API does not support limit or totalCount — returns all playlists.
         private static readonly string PlaylistsQuery =
-            @"query {
-                playlists(query: {}) {
+            @"query Playlists($teamId: String, $limit: Int) {
+                playlists(query: {}, teamId: $teamId, limit: $limit) {
                     page {
                         edges {
                             node {
@@ -171,13 +170,18 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         }
 
         /// <summary>
-        /// Fetches the full playlist list for the account.
+        /// Fetches the playlist list for the account, optionally scoped to a team and limited in count.
         /// Returns null if the endpoint is unavailable or returns an error.
         /// The caller should fall back to the config-provided list when null is returned.
         /// </summary>
-        public async Task<List<PlaylistNode>> GetPlaylistsAsync(string caller = null)
+        public async Task<List<PlaylistNode>> GetPlaylistsAsync(string teamId = null, int limit = 0, string caller = null)
         {
-            var data = await ExecuteAsync<PlaylistsQueryData>(PlaylistsQuery, null, caller, "GetPlaylists")
+            var variables = new PlaylistsVariables
+            {
+                TeamId = teamId,
+                Limit = limit > 0 ? (int?)limit : null
+            };
+            var data = await ExecuteAsync<PlaylistsQueryData>(PlaylistsQuery, variables, caller, "GetPlaylists")
                 .ConfigureAwait(false);
 
             if (data?.Playlists?.Page?.Edges == null)
@@ -232,13 +236,29 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             string playlistId,
             string caller = null)
         {
+            return await AssignContentAsync(deviceId, teamId, playlistId, "PLAYLIST", caller)
+                .ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Assigns content to a device using the updateDevice mutation.
+        /// Sets currentType to the provided contentType ("ASSET" or "PLAYLIST")
+        /// and currentAssetId to the content ID.
+        /// </summary>
+        public async Task<bool> AssignContentAsync(
+            string deviceId,
+            string teamId,
+            string contentId,
+            string contentType,
+            string caller = null)
+        {
             var payload = new UpdateDeviceInput
             {
-                CurrentType = "PLAYLIST",
-                CurrentAssetId = playlistId
+                CurrentType = contentType,
+                CurrentAssetId = contentId
             };
 
-            return await UpdateDeviceAsync(deviceId, teamId, payload, caller, playlistId).ConfigureAwait(false);
+            return await UpdateDeviceAsync(deviceId, teamId, payload, caller, contentId).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -258,7 +278,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             {
                 TeamId = teamId,
                 Payload = payload,
-                Force = force
+                Force = force ? (bool?)true : null
             };
 
             var deviceIds = payload.DeviceIds != null && payload.DeviceIds.Count > 0
