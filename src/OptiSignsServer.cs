@@ -302,7 +302,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             {
                 this.LogDebug("Exporting playlists...");
 
-                var playlists = await _client.GetPlaylistsAsync(Key).ConfigureAwait(false);
+                var playlists = await _client.GetPlaylistsAsync(caller: Key).ConfigureAwait(false);
 
                 if (playlists == null)
                 {

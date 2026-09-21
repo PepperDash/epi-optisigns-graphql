@@ -58,7 +58,6 @@ The `deviceId` is the MongoDB `_id` of the OptiSigns screen. Obtain it by callin
         "name": "Lobby Display",
         "deviceId": "YOUR_OPTISIGNS_SCREEN_DEVICE_ID_HERE",
         "teamId": "YOUR_TEAM_ID_HERE",
-        "defaultPlaylistId": "YOUR_DEFAULT_PLAYLIST_ID_HERE",
         "playlists": [
           { "id": "PLAYLIST_ID_1", "name": "Welcome Loop" },
           { "id": "PLAYLIST_ID_2", "name": "Event Content" },
@@ -69,8 +68,7 @@ The `deviceId` is the MongoDB `_id` of the OptiSigns screen. Obtain it by callin
         "key": "player2",
         "name": "Conference Room Display",
         "deviceId": "ANOTHER_DEVICE_ID",
-        "teamId": "YOUR_TEAM_ID_HERE",
-        "defaultPlaylistId": "PLAYLIST_ID_1"
+        "teamId": "YOUR_TEAM_ID_HERE"
       }
     ]
   }
@@ -94,7 +92,6 @@ The `deviceId` is the MongoDB `_id` of the OptiSigns screen. Obtain it by callin
 | `name`              | string | No       | —       | Display name for the player (falls back to API name, then device key)             |
 | `deviceId`          | string | Yes      | —       | MongoDB `_id` of the target OptiSigns screen                                      |
 | `teamId`            | string | Yes      | —       | OptiSigns team ID, required in all mutations                                      |
-| `defaultPlaylistId` | string | No       | —       | Playlist pushed on `PowerOn` when no prior playlist is known                      |
 | `playlists`         | array  | No       | `[]`    | Static fallback playlist list; used when the API `playlists` query is unavailable |
 
 ---
@@ -201,7 +198,7 @@ Join numbers below are **relative to `joinStart`**.
 |                       | 1     | Device Name fb                                                 |
 |                       | 2     | Last HeartBeat fb (ISO 8601)                                   |
 | Select Playlist by ID | 6     | Current Playlist Name fb                                       |
-|                       | 11    | Playlist Item[1] fb (JSON or pipe-delimited, see D6)           |
+|                       | 11    | Playlist Item[1] fb (JSON or name only, see D6)                |
 |                       | 12    | Playlist Item[2] fb                                            |
 |                       | …     | …                                                              |
 |                       | 40    | Playlist Item[30] fb                                           |
@@ -212,7 +209,7 @@ Join numbers below are **relative to `joinStart`**.
 - **D3–D5 Pagination** — Navigate through playlists when there are more than 30. Page First returns to the beginning.
 - **D6 PlaylistItemAsJsonObject** — Controls the format of playlist items on S11–S40:
   - **High** (default): JSON format `{"id":"...","name":"..."}`
-  - **Low**: Pipe-delimited format `{ListIndex}|{id}|{name}`
+  - **Low**: Name only
 
 #### Player Analog Join Notes
 

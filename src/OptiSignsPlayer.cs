@@ -66,7 +66,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         public const int MaxPlaylistBridgeCount = 30;
 
         // When true (D6 high), playlist items are sent as JSON; when false, as name only
-        private bool playlistItemAsJsonFormat = false;
+        private bool playlistItemAsJsonFormat = true;
 
         private CTimer statusPollTimer;
         private CTimer playlistPollTimer;
@@ -131,7 +131,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             IsOnlineFeedback = new BoolFeedback(key + "-IsOnline", () => isOnline);
             PowerIsOnFeedback = new BoolFeedback(key + "-PowerIsOn", () => powerIsOn);
             PowerIsOffFeedback = new BoolFeedback(key + "-PowerIsOff", () => !powerIsOn);
-            IsPollingFeedback = new BoolFeedback(key + "-IsPolling", () => isPolling);
+            IsPollingFeedback = new BoolFeedback(key + "-IsPolling", () => isPolling || isPlaylistPolling);
             PlaylistSelectionBusyFeedback = new BoolFeedback(key + "-PlaylistSelectionBusy", () => playlistSelectionBusy);
             AbsoluteInputSelectFeedback = new IntFeedback(key + "-AbsoluteInputSelect", () => currentPlaylistIndex);
             RelativeInputSelectFeedback = new IntFeedback(key + "-RelativeInputSelect", () => GetPageRelativePlaylistIndex());
@@ -342,6 +342,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         {
             if (isPlaylistPolling) return;
             isPlaylistPolling = true;
+            IsPollingFeedback.FireUpdate();
             try
             {
                 var apiPlaylists = await client.GetPlaylistsAsync(playerConfig.TeamId, playlistLimit, Key)
@@ -393,6 +394,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             finally
             {
                 isPlaylistPolling = false;
+                IsPollingFeedback.FireUpdate();
             }
         }
 
@@ -483,6 +485,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             if (string.IsNullOrEmpty(playlistId))
             {
                 this.LogWarning("SelectById: empty ID");
+                return;
+            }
+
+            if (playlistSelectionBusy)
+            {
+                this.LogWarning("SelectById: busy, ignoring '{0}'", playlistId);
                 return;
             }
 
@@ -589,6 +597,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
             if (string.IsNullOrEmpty(playlistId))
             {
                 this.LogWarning("Assign: empty ID");
+                return;
+            }
+
+            if (playlistSelectionBusy)
+            {
+                this.LogWarning("Assign: busy, ignoring '{0}'", playlistId);
                 return;
             }
 

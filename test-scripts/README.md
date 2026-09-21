@@ -11,7 +11,7 @@ Python scripts for manually testing the OptiSigns GraphQL API. No third-party de
 | `poll_playlists.py` | Query all playlists in the account                 |
 | `poll_devices.py`   | Query all devices (screens/players) in the account |
 | `poll_assets.py`    | Query assets — all, or filtered by name            |
-| `poll_me.py`        | Query the current authenticated user               |
+| `poll_me.py`        | API-key/device-access health check                 |
 | `poll_teams.py`     | Query all teams in the account                     |
 | `assign_content.py` | Assign an asset or playlist to a device            |
 | `_utils.py`         | Shared logging utility (not run directly)          |
@@ -79,7 +79,7 @@ After sourcing, all `DEVICE_*` and `ASSET_*` variables are available for use in 
 Every script run automatically creates a timestamped log file in `test-scripts/logs/`:
 
 ```
-test-scripts/logs/YYYY-MM-DD_HH:MM:SS:tt-<scriptname>.txt
+test-scripts/logs/YYYY-MM-DD_HH-MM-SS-tt-<scriptname>.txt
 ```
 
 `tt` = centiseconds (2 digits). All console output — including errors — is written to both the terminal and the log file simultaneously. The log path is printed at the start of each run.
@@ -176,7 +176,7 @@ python3 ./test-scripts/poll_assets.py --api-key YOUR_KEY
 
 ### poll_me.py
 
-Returns info about the currently authenticated user.
+Verifies an OptiSigns API key and summarises account access. The `me` query requires user-level OAuth and returns `API_NOT_AVAILABLE` for API-key auth, so this script queries `devices` instead — an equivalent "who am I / what do I have access to" health check for service-level API keys.
 
 ```bash
 python3 ./test-scripts/poll_me.py
@@ -186,10 +186,10 @@ python3 ./test-scripts/poll_me.py --api-key YOUR_KEY
 ```
 
 | Argument    | Required | Description                             |
-| ----------- | -------- | --------------------------------------- |
+| ----------- | -------- | ---------------------------------------- |
 | `--api-key` | No       | Overrides `OPTISIGNS_API_KEY` in `.env` |
 
-**Output fields:** `ID`, `Account ID`, `Name`, `Email`, `Username`
+**Output columns:** `Device ID`, `Name`, `Type`, `Status`
 
 ---
 
@@ -238,11 +238,13 @@ python3 ./test-scripts/assign_content.py --type ASSET --device-id $DEVICE_LOBBY 
 | Argument        | Required | Default                           | Description                                                       |
 | --------------- | -------- | --------------------------------- | ----------------------------------------------------------------- |
 | `--type`        | No       | `ASSET`                           | `ASSET` or `PLAYLIST`                                             |
-| `--device-id`   | No       | See below                         | Device `_id` to update; use `$DEVICE_*` variables                 |
-| `--content-id`  | No       | See below                         | Asset or playlist `_id`; use `$ASSET_*` / `$PLAYLIST_*` variables |
+| `--device-id`   | Yes\*    | `ASSET_DEVICE_ID` / `PLAYLIST_DEVICE_ID` in `.env` | Device `_id` to update; use `$DEVICE_*` variables                 |
+| `--content-id`  | Yes\*    | `ASSET_CONTENT_ID` / `PLAYLIST_CONTENT_ID` in `.env` | Asset or playlist `_id`; use `$ASSET_*` / `$PLAYLIST_*` variables |
 | `--team-id`     | No       | `TEAM_ID` in `.env` (default `1`) | Team that owns the device                                         |
 | `--device-name` | No       | `GraphAPI Test`                   | Display name written to the device                                |
 | `--orientation` | No       | `LANDSCAPE`                       | `LANDSCAPE` or `PORTRAIT`                                         |
 | `--api-key`     | No       | —                                 | Overrides `OPTISIGNS_API_KEY` in `.env`                           |
+
+\* Required unless the matching `_DEVICE_ID` / `_CONTENT_ID` environment variable (keyed by `--type`) is set in `.env` — there is no hardcoded fallback, to avoid silently mutating stale resources in another account.
 
 

@@ -21,7 +21,6 @@
 							"name": "Player 1",
 							"deviceId": "DEVICE_ID_123",
 							"teamId": "TEAM_ID_123",
-							"defaultPlaylistId": "PLAYLIST_ID_1",
 							"playlists": [
 								{ "id": "PLAYLIST_ID_1", "name": "Welcome Loop"        },
 								{ "id": "PLAYLIST_ID_2", "name": "Event Content"       },

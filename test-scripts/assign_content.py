@@ -15,8 +15,8 @@ Usage:
 If --api-key is omitted the script reads OPTISIGNS_API_KEY from test-scripts/.env.
 
 --type      : ASSET or PLAYLIST (default: ASSET)
---device-id : The device _id to update
---content-id: The asset _id or playlist _id to assign
+--device-id : The device _id to update (required, or set ASSET_DEVICE_ID / PLAYLIST_DEVICE_ID in .env)
+--content-id: The asset _id or playlist _id to assign (required, or set ASSET_CONTENT_ID / PLAYLIST_CONTENT_ID in .env)
 --device-name: Display name for the device (default: GraphAPI Test)
 --orientation: LANDSCAPE or PORTRAIT (default: LANDSCAPE)
 """
@@ -51,7 +51,8 @@ mutation UpdateDevice(
 }
 """
 
-# Default test values keyed by content type
+# Default test values keyed by content type. Sourced from environment variables (test-scripts/.env)
+# rather than hardcoded so the no-argument form can never mutate stale resources in another account.
 def _load_env():
     """Load key=value pairs from .env in the same directory as this script."""
     env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -66,16 +67,17 @@ def _load_env():
             os.environ.setdefault(key.strip(), value.strip())
 
 
-DEFAULTS = {
-    "ASSET": {
-        "device_id": "6682d6d553fca60012953e17",
-        "content_id": "uRQynMhDsJ6QY35Wf",
-    },
-    "PLAYLIST": {
-        "device_id": "6126edf99834540019b30ff1",
-        "content_id": "d87B9ARKPyH8YYBbs",
-    },
-}
+def _defaults():
+    return {
+        "ASSET": {
+            "device_id": os.environ.get("ASSET_DEVICE_ID"),
+            "content_id": os.environ.get("ASSET_CONTENT_ID"),
+        },
+        "PLAYLIST": {
+            "device_id": os.environ.get("PLAYLIST_DEVICE_ID"),
+            "content_id": os.environ.get("PLAYLIST_CONTENT_ID"),
+        },
+    }
 
 
 def assign_content(
@@ -164,9 +166,18 @@ def main():
     if not args.api_key:
         parser.error("--api-key is required or set OPTISIGNS_API_KEY in test-scripts/.env")
 
-    defaults = DEFAULTS[args.content_type]
+    defaults = _defaults()[args.content_type]
     device_id = args.device_id or defaults["device_id"]
     content_id = args.content_id or defaults["content_id"]
+
+    if not device_id:
+        parser.error(
+            f"--device-id is required or set {args.content_type}_DEVICE_ID in test-scripts/.env"
+        )
+    if not content_id:
+        parser.error(
+            f"--content-id is required or set {args.content_type}_CONTENT_ID in test-scripts/.env"
+        )
 
     print(f"Assigning {args.content_type.lower()} '{content_id}' to device '{device_id}' (teamId: {args.team_id})...")
     result = assign_content(

@@ -89,20 +89,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         public string TeamId { get; set; }
 
         /// <summary>
-        /// Content _id assigned to the screen when PowerOn is called and no prior content
-        /// has been tracked. Falls back to the first item in Playlists if null.
-        /// </summary>
-        [JsonProperty("defaultContentId")]
-        public string DefaultContentId { get; set; }
-
-        /// <summary>
-        /// Content type used with DefaultContentId. Must be "ASSET" or "PLAYLIST".
-        /// Default: "PLAYLIST".
-        /// </summary>
-        [JsonProperty("defaultContentType")]
-        public string DefaultContentType { get; set; }
-
-        /// <summary>
         /// Static fallback playlist list for this player. Used when the API playlists 
         /// query is unavailable. Also used on startup before the first playlist poll completes.
         /// </summary>
@@ -111,7 +97,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
 
         public OptiSignsPlayerConfig()
         {
-            DefaultContentType = "PLAYLIST";
             Playlists = new List<PlaylistConfigItem>();
         }
     }

@@ -87,9 +87,12 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         // NOTE: The playlists query is not in the official TypeScript SDK (Phase 2).
         // We attempt it directly. GetPlaylistsAsync returns null if the endpoint
         // is not yet live — the caller falls back to the config-provided list.
+        // The API does not support a limit argument (see OptiSignsTypes.cs); requesting
+        // one causes a GraphQL validation error that fails the whole operation, so any
+        // result-count limiting is applied client-side in GetPlaylistsAsync instead.
         private static readonly string PlaylistsQuery =
-            @"query Playlists($teamId: String, $limit: Int) {
-                playlists(query: {}, teamId: $teamId, limit: $limit) {
+            @"query Playlists($teamId: String) {
+                playlists(query: {}, teamId: $teamId) {
                     page {
                         edges {
                             node {
@@ -176,11 +179,7 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
         /// </summary>
         public async Task<List<PlaylistNode>> GetPlaylistsAsync(string teamId = null, int limit = 0, string caller = null)
         {
-            var variables = new PlaylistsVariables
-            {
-                TeamId = teamId,
-                Limit = limit > 0 ? (int?)limit : null
-            };
+            var variables = new PlaylistsVariables { TeamId = teamId };
             var data = await ExecuteAsync<PlaylistsQueryData>(PlaylistsQuery, variables, caller, "GetPlaylists")
                 .ConfigureAwait(false);
 
@@ -193,6 +192,11 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 if (edge?.Node != null)
                     result.Add(edge.Node);
             }
+
+            // The API itself does not support a limit argument; truncate client-side instead.
+            if (limit > 0 && result.Count > limit)
+                result = result.GetRange(0, limit);
+
             return result;
         }
 
@@ -368,37 +372,37 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
                 var requestBodyJson = JsonConvert.SerializeObject(requestBody);
                 
                 LogRequest(caller, operation, info, requestBodyJson?.Length ?? 0);
-                
-                var content = new StringContent(requestBodyJson, Encoding.UTF8, "application/json");
 
-                var request = new HttpRequestMessage(HttpMethod.Post, GraphQlEndpoint)
+                using (var content = new StringContent(requestBodyJson, Encoding.UTF8, "application/json"))
+                using (var request = new HttpRequestMessage(HttpMethod.Post, GraphQlEndpoint) { Content = content })
                 {
-                    Content = content
-                };
-                request.Headers.Authorization =
-                    new AuthenticationHeaderValue("Bearer", _apiKey);
+                    request.Headers.Authorization =
+                        new AuthenticationHeaderValue("Bearer", _apiKey);
 
-                var httpResponse = await HttpClient.SendAsync(request).ConfigureAwait(false);
-                var responseBody = await httpResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    using (var httpResponse = await HttpClient.SendAsync(request).ConfigureAwait(false))
+                    {
+                        var responseBody = await httpResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
 
-                LogResponse(caller, operation, info, httpResponse, responseBody?.Length ?? 0);
+                        LogResponse(caller, operation, info, httpResponse, responseBody?.Length ?? 0);
 
-                if (!httpResponse.IsSuccessStatusCode)
-                {
-                    this.LogError("HTTP {0} {1}", (int)httpResponse.StatusCode, httpResponse.ReasonPhrase);
-                    return null;
+                        if (!httpResponse.IsSuccessStatusCode)
+                        {
+                            this.LogError("HTTP {0} {1}", (int)httpResponse.StatusCode, httpResponse.ReasonPhrase);
+                            return null;
+                        }
+
+                        var envelope = JsonConvert.DeserializeObject<GraphQlResponse<T>>(responseBody);
+
+                        if (envelope?.Errors != null && envelope.Errors.Count > 0)
+                        {
+                            foreach (var error in envelope.Errors)
+                                LogGraphQlError(error, requestBodyJson, responseBody);
+                            // Return data anyway; partial results are valid in GraphQL
+                        }
+
+                        return envelope?.Data;
+                    }
                 }
-
-                var envelope = JsonConvert.DeserializeObject<GraphQlResponse<T>>(responseBody);
-
-                if (envelope?.Errors != null && envelope.Errors.Count > 0)
-                {
-                    foreach (var error in envelope.Errors)
-                        LogGraphQlError(error, requestBodyJson, responseBody);
-                    // Return data anyway; partial results are valid in GraphQL
-                }
-
-                return envelope?.Data;
             }
             catch (TaskCanceledException)
             {

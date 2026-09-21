@@ -190,9 +190,6 @@ namespace PepperDash.Essentials.Plugins.Optisigns.GraphQL
     {
         [JsonProperty("teamId", NullValueHandling = NullValueHandling.Ignore)]
         public string TeamId { get; set; }
-
-        [JsonProperty("limit", NullValueHandling = NullValueHandling.Ignore)]
-        public int? Limit { get; set; }
     }
 
     // ──────────────────────────────────────────────

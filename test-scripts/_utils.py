@@ -46,7 +46,7 @@ def setup_logging(script_name: str = "") -> str:
     Creates a timestamped log file under test-scripts/logs/ and redirects
     stdout/stderr so all output is written to both the console and the file.
 
-    Filename format: YYYY-MM-DD_HH:MM:SS:tt-<script_name>.txt  (tt = centiseconds)
+    Filename format: YYYY-MM-DD_HH-MM-SS-tt-<script_name>.txt  (tt = centiseconds)
 
     Returns the path to the log file.
     """
@@ -55,7 +55,7 @@ def setup_logging(script_name: str = "") -> str:
 
     now = datetime.now()
     cs = now.microsecond // 10000  # centiseconds (2 digits)
-    ts = now.strftime("%Y-%m-%d_%H:%M:%S:") + f"{cs:02d}"
+    ts = now.strftime("%Y-%m-%d_%H-%M-%S-") + f"{cs:02d}"
     # Strip .py extension and sanitize for use in a filename
     stem = os.path.splitext(script_name)[0] if script_name else "log"
     log_path = os.path.join(logs_dir, f"{ts}-{stem}.txt")
